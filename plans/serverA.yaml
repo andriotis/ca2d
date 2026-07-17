@@ -1,0 +1,19 @@
+# Example launch manifest — edit tables/seeds/devices to the server's topology,
+# then:  python bench.py launch plans/serverA.yaml --dry-run
+# Rules (enforced by `launch` before anything starts):
+#   - no two jobs may share a cell (they would write the same result JSON)
+#   - no two jobs may share a device
+# Within a job, seeds/EL2N runs are balanced dynamically over its devices.
+jobs:
+  - name: cifar100-conv-s45s46
+    table: conv-cifar100
+    seeds: [45, 46]
+    devices: [cuda:0, cuda:1]
+  - name: cifar100-rn18-s45s46
+    table: rn18-cifar100
+    seeds: [45, 46]
+    devices: [cuda:2, cuda:3]
+    # optional narrowing (defaults = full table):
+    # methods: [random, el2nbest, cadprune, sharp, rcad, rded, ca2d, sharp2d, rcad2d]
+    # regimes: [hl, sl, kd]
+    # ipcs: [10, 50, 100]

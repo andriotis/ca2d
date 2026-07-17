@@ -6,7 +6,7 @@ resnet18-tinyimagenet. Columns = HL / SL / KD+SL x IPC {10,50,100}; rows = Cores
 Selection (Random Real, EL2N-Best, CAD-Prune, SHARP (ours), R-CAD (ours)) and
 Dataset Distillation (RDED, CA2D, SHARP-2D (ours), R-CAD-2D (ours) — the 2D
 variants replace CA2D's CAD-ranked mipc pool with the SHARP/R-CAD FL selection at
-the same budget [REPORT Sec.4]); mean +- std over seeds {42,43,44} with one-sided
+the same budget [REPORT Sec.4]); mean +- std over seeds {42..46} with one-sided
 Welch p-values. A compute-matched Full-Dataset reference cell can be produced on
 demand (`cell --method full` / `run --methods full`) but is not shown in tables.
 
@@ -37,7 +37,7 @@ Implicit choices (documented for the paper):
   [B4]  EL2N-Best window grid = start offsets {0,10,..,90}% of (pool-ipc) over the
         per-class descending EL2N ranking; winner by TEST accuracy (as [HT]
         implicitly does — flagged in the paper text); search at seed 42 only,
-        winner re-run at 3 seeds (seed-42 search result reused).
+        winner re-run at the remaining seeds (seed-42 search result reused).
   [B5]  coresets are exported as PNG for the KD path (JPEG re-encoding costs
         1.6-3.1pp at 32px); synthesized sets stay official JPEG.
   [B6]  Full-Dataset rows are compute-matched: epochs = 300*ipc*nclass/N = 6/30/60,
@@ -49,7 +49,20 @@ Implicit choices (documented for the paper):
   [B8]  scoring run = single seed-0 run ([HT] is silent on averaging).
   [B9]  RDED synthesis via official synthesize/main.py; its pool shuffle / crop RNG
         is unseeded upstream — the worker seeds python/np/torch with 0.
-  [B10] Random rows: fixed class-balanced draw (RandomState(0)) x 3 training seeds.
+  [B10] Random rows: fixed class-balanced draw (RandomState(0)) x training seeds.
+
+Multi-GPU: --devices cuda:0,cuda:1,cuda:2 (run/cell/el2n) distributes the per-cell
+training seeds, the [B3] EL2N runs and the [B4] window searches one job per GPU.
+Each HL/SL seed runs in a `seed-worker` subprocess pinned via CUDA_VISIBLE_DEVICES
+(hl_train/sl_train draw batch perms + DSA from the process-global RNG, so
+in-process concurrency would break determinism); KD seeds are the existing
+rded-worker subprocesses dispatched concurrently. Per-seed results are
+byte-identical to a sequential run. Without --devices every path is unchanged.
+
+Multi-server: `launch` runs a YAML manifest of jobs (each job = table subset x
+seeds x devices; validated cell/device-disjoint before anything starts); `merge`
+folds result dirs copied back from other machines into RESULT_DIR, unioning the
+per-cell seed lists (see RUNBOOK-seeds.md).
 
 Usage:
     python bench.py selftest
@@ -59,17 +72,23 @@ Usage:
     python bench.py select --ds cifar100 --arch conv --method rcad --ipc 100
     python bench.py cell   --ds cifar100 --arch conv --method rded --regime kd --ipc 10
     python bench.py run    --table conv-cifar100 [--regimes hl,sl,kd] [--methods ...]
+    python bench.py run    --table conv-cifar100 --devices cuda:0,cuda:1,cuda:2
     python bench.py table  [--table rn18-tin]
     python bench.py tex
     python bench.py timing
+    python bench.py launch plans/serverA.yaml [--dry-run]
+    python bench.py merge  ~/incoming/*/ [--dry-run]
 """
 
 import argparse
+import concurrent.futures
 import json
 import os
+import queue
 import re
 import subprocess
 import sys
+import threading
 import time
 
 import numpy as np
@@ -116,8 +135,10 @@ OURS = ("sharp", "rcad", "sharp2d", "rcad2d")
 EL2N_SEEDS = tuple(range(1000, 1010))   # [B3]
 EL2N_EPOCH = 20                         # [B3]
 EL2N_OFFSETS = tuple(range(0, 100, 10))  # [B4] % of (pool - ipc)
+EL2N_SEARCH_SEED = 42                    # [B4] window search always at seed 42
 RE_BEST = re.compile(r"Best accuracy is ([0-9.]+)@(\d+)")
 RE_EPOCH = re.compile(r"TRAIN Iter (\d+): loss = ([0-9.eE+-]+)")
+RE_SEED = re.compile(r"SEED-RESULT ([0-9.]+) ([0-9.]+)")
 
 # Pipeline anchors (not shown in tables): [RDED Tab.2] KD+SL under RDED's own
 # validation — cifar100 conv 48.1/57.0, rn18 42.6/62.6; tin conv 39.6/47.6,
@@ -300,38 +321,57 @@ def run_score(ds, arch, ipc, device, out_path):
     return blob
 
 
-def el2n_mean(ds, arch, device):
-    """[B3] mean EL2N over 10 independently-seeded truncated-HL runs at epoch 20."""
+def el2n_run_path(ds, arch, r):
+    return os.path.join(SCORE_DIR, f"el2n_{ds}_{arch}_e{EL2N_EPOCH}_run{r}.pt")
+
+
+def el2n_run(ds, arch, r, device, epoch_hook=None):
+    """One [B3] truncated-HL EL2N run at seed r, cache-first. Returns the path."""
+    p = el2n_run_path(ds, arch, r)
+    if os.path.exists(p):
+        return p
+    os.makedirs(SCORE_DIR, exist_ok=True)
     d = BDS[ds]
-    runs = []
-    for r in EL2N_SEEDS:
-        p = os.path.join(SCORE_DIR, f"el2n_{ds}_{arch}_e{EL2N_EPOCH}_run{r}.pt")
-        if not os.path.exists(p):
-            os.makedirs(SCORE_DIR, exist_ok=True)
-            t0 = time.time()
-            xtr_u8, ytr = load_train(ds)
-            set_seed(r)
-            x = to_norm_tensor(xtr_u8, d["mean"], d["std"]).contiguous()
-            y = torch.from_numpy(ytr).long()
-            y1h = F.one_hot(y, d["nclass"]).float()
-            model = build_student(ds, arch)
-            out = {}
-            bar = tqdm(total=EL2N_EPOCH, desc=f"el2n {ds}/{arch} run{r}", unit="ep",
-                       dynamic_ncols=True, leave=False)
+    t0 = time.time()
+    xtr_u8, ytr = load_train(ds)
+    set_seed(r)
+    x = to_norm_tensor(xtr_u8, d["mean"], d["std"]).contiguous()
+    y = torch.from_numpy(ytr).long()
+    y1h = F.one_hot(y, d["nclass"]).float()
+    model = build_student(ds, arch)
+    out = {}
+    bar = None
+    if epoch_hook is None:
+        bar = tqdm(total=EL2N_EPOCH, desc=f"el2n {ds}/{arch} run{r}", unit="ep",
+                   dynamic_ncols=True, leave=False)
+        epoch_hook = bar_hook(bar)
 
-            def hook(ep, m):
-                bar.update(1)
-                if ep == EL2N_EPOCH - 1:
-                    out["el2n"] = el2n_scores(m, x, y1h, device)
+    def hook(ep, m):
+        epoch_hook(ep, m)
+        if ep == EL2N_EPOCH - 1:
+            out["el2n"] = el2n_scores(m, x, y1h, device)
 
-            # StepLR@151 never fires inside 20 epochs -> constant early-training lr
-            hl_train(model, x, y, device, epochs=EL2N_EPOCH, step_epoch=151,
-                     aug="dsa", epoch_hook=hook)
-            bar.close()
-            torch.save({"el2n": out["el2n"], "seed": r, "epoch": EL2N_EPOCH,
-                        "secs": time.time() - t0}, p)
-            print(f"[el2n] saved {p} ({time.time() - t0:.0f}s)")
-        runs.append(torch.load(p, map_location="cpu")["el2n"])
+    # StepLR@151 never fires inside 20 epochs -> constant early-training lr
+    hl_train(model, x, y, device, epochs=EL2N_EPOCH, step_epoch=151,
+             aug="dsa", epoch_hook=hook)
+    if bar is not None:
+        bar.close()
+    torch.save({"el2n": out["el2n"], "seed": r, "epoch": EL2N_EPOCH,
+                "secs": time.time() - t0}, p)
+    print(f"[el2n] saved {p} ({time.time() - t0:.0f}s)", flush=True)
+    return p
+
+
+def el2n_mean(ds, arch, device, devices=None):
+    """[B3] mean EL2N over 10 independently-seeded truncated-HL runs at epoch 20."""
+    devices = list(devices or [device])
+    missing = [r for r in EL2N_SEEDS
+               if not os.path.exists(el2n_run_path(ds, arch, r))]
+    if len(devices) > 1 and missing:
+        device_pool_map(lambda r, dev: run_el2n_worker(ds, arch, r, dev),
+                        missing, devices)
+    runs = [torch.load(el2n_run(ds, arch, r, device), map_location="cpu")["el2n"]
+            for r in EL2N_SEEDS]
     return torch.stack(runs).mean(0)
 
 
@@ -673,11 +713,117 @@ def cmd_rded_worker(cfg_path, selfcheck=False):
 
 
 # --------------------------------------------------------------------------- #
+# Seed-parallel execution across GPUs (see module docstring, "Multi-GPU")
+# --------------------------------------------------------------------------- #
+def device_pool_map(fn, jobs, devices):
+    """fn(job, device) over jobs, at most one in flight per device; results in
+    job order. Threads only marshal subprocesses, so the GIL is irrelevant."""
+    free = queue.Queue()
+    for d in devices:
+        free.put(d)
+
+    def run(job):
+        dev = free.get()
+        try:
+            return fn(job, dev)
+        finally:
+            free.put(dev)
+
+    with concurrent.futures.ThreadPoolExecutor(len(devices)) as ex:
+        return list(ex.map(run, jobs))
+
+
+def run_seed_worker(cfg, device, log_path, total, desc):
+    """Launch `bench.py seed-worker` pinned to one GPU; stream/parse its output.
+    Subprocess isolation keeps each run's global RNG stream (batch perms, DSA,
+    model init) byte-identical to a sequential run. Returns (acc, secs)."""
+    os.makedirs(LOG_DIR, exist_ok=True)
+    cfg_path = log_path + ".cfg.json"
+    with open(cfg_path, "w") as f:
+        json.dump(cfg, f, indent=2)
+    env = os.environ.copy()
+    env["CUDA_VISIBLE_DEVICES"] = gpu_index(device)
+    proc = subprocess.Popen(
+        [sys.executable, os.path.abspath(__file__), "seed-worker", "--cfg", cfg_path],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+        env=env)
+    bar = tqdm(total=total, desc=desc, unit="ep", dynamic_ncols=True, leave=False)
+    res = None
+    with open(log_path, "w") as lg:
+        for line in proc.stdout:
+            lg.write(line)
+            if line.startswith("SEED-EP"):
+                bar.update(1)
+            m = RE_SEED.match(line)
+            if m:
+                res = (float(m.group(1)), float(m.group(2)))
+    rc = proc.wait()
+    bar.close()
+    if rc != 0 or res is None:
+        raise RuntimeError(f"seed-worker failed (rc={rc}); log: {log_path}")
+    return res
+
+
+def seed_job(ds, arch, set_name, regime, ipc, seed, device, desc, re_epochs=None):
+    """One seed of one cell on one GPU; HL/SL go through a seed-worker subprocess
+    so concurrent seeds cannot interleave the process-global RNG."""
+    if regime == "kd":
+        return train_once(ds, arch, set_name, "kd", ipc, seed, device,
+                          re_epochs=re_epochs, desc=desc)
+    cfg = dict(kind="hlsl", ds=ds, arch=arch, set=set_name, regime=regime,
+               ipc=ipc, seed=seed)
+    log = os.path.join(LOG_DIR, f"hlsl_{ds}_{arch}_{set_name or 'full'}_"
+                                f"{regime}_ipc{ipc}_s{seed}.log")
+    total = 300 if set_name is not None else compute_K(ds, ipc)
+    return run_seed_worker(cfg, device, log, total, desc)
+
+
+def run_el2n_worker(ds, arch, r, device):
+    """One [B3] EL2N run in a seed-worker subprocess (saves el2n_run_path)."""
+    cfg = dict(kind="el2n", ds=ds, arch=arch, seed=r)
+    log = os.path.join(LOG_DIR, f"el2n_{ds}_{arch}_run{r}.log")
+    run_seed_worker(cfg, device, log, EL2N_EPOCH, desc=f"el2n {ds}/{arch} run{r}")
+    assert os.path.exists(el2n_run_path(ds, arch, r)), log
+
+
+def cmd_seed_worker(cfg_path):
+    """Runs inside the subprocess: one HL/SL seed or one EL2N run on the single
+    visible GPU; per-epoch SEED-EP lines, final SEED-RESULT <acc> <secs>."""
+    with open(cfg_path) as f:
+        cfg = json.load(f)
+    device = torch.device("cuda:0")  # parent pins via CUDA_VISIBLE_DEVICES
+
+    def hook(ep, m):
+        print(f"SEED-EP {ep}", flush=True)
+
+    if cfg["kind"] == "el2n":
+        t0 = time.time()
+        el2n_run(cfg["ds"], cfg["arch"], cfg["seed"], device, epoch_hook=hook)
+        print(f"SEED-RESULT 0 {time.time() - t0:.1f}", flush=True)
+    else:
+        st = hl_sl_setup(cfg["ds"], cfg["arch"], cfg["set"], cfg["regime"],
+                         cfg["ipc"], device)
+        acc, secs = hl_sl_seed_run(st, cfg["ds"], cfg["arch"], cfg["regime"],
+                                   cfg["seed"], device, desc="", epoch_hook=hook)
+        print(f"SEED-RESULT {acc:.6f} {secs:.1f}", flush=True)
+    return 0
+
+
+# --------------------------------------------------------------------------- #
 # Cells
 # --------------------------------------------------------------------------- #
 def result_path(ds, arch, method, regime, ipc):
     return os.path.join(RESULT_DIR,
                         f"bench_{ds}_{arch}_{method}_{regime}_ipc{ipc}.json")
+
+
+def write_json(path, obj):
+    """Atomic write: an interrupt can never leave a truncated result JSON."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(obj, f, indent=2)
+    os.replace(tmp, path)
 
 
 def legacy_result(ds, arch, method, regime, ipc):
@@ -741,20 +887,25 @@ def hl_sl_setup(ds, arch, set_name, regime, ipc, device):
                 step=round(epochs * 151 / 300))
 
 
-def hl_sl_seed_run(st, ds, arch, regime, seed, device, desc, batch=256):
+def hl_sl_seed_run(st, ds, arch, regime, seed, device, desc, batch=256,
+                   epoch_hook=None):
     t0 = time.time()
     set_seed(seed)
     model = build_student(ds, arch)
-    bar = tqdm(total=st["epochs"], desc=desc, unit="ep", dynamic_ncols=True,
-               leave=False)
+    bar = None
+    if epoch_hook is None:
+        bar = tqdm(total=st["epochs"], desc=desc, unit="ep", dynamic_ncols=True,
+                   leave=False)
+        epoch_hook = bar_hook(bar)
     if regime == "hl":
         hl_train(model, st["x"], st["y"], device, epochs=st["epochs"],
                  step_epoch=st["step"], aug="dsa", batch=batch,
-                 epoch_hook=bar_hook(bar))
+                 epoch_hook=epoch_hook)
     else:
         sl_train(model, st["x"], st["q_T"], device, epochs=st["epochs"],
-                 batch=batch, epoch_hook=bar_hook(bar))
-    bar.close()
+                 batch=batch, epoch_hook=epoch_hook)
+    if bar is not None:
+        bar.close()
     acc = test_top1(model, st["xte"], st["yte"], device)
     return acc, time.time() - t0
 
@@ -773,9 +924,11 @@ def train_once(ds, arch, set_name, regime, ipc, seed, device, re_epochs=None,
     return hl_sl_seed_run(st, ds, arch, regime, seed, device, desc)
 
 
-def eval_cell(ds, arch, method, regime, ipc, seeds, device, smoke_epochs=None):
+def eval_cell(ds, arch, method, regime, ipc, seeds, device, smoke_epochs=None,
+              devices=None):
+    devices = list(devices or [device])
     if method == "el2nbest":
-        return eval_el2nbest(ds, arch, regime, ipc, seeds, device)
+        return eval_el2nbest(ds, arch, regime, ipc, seeds, device, devices)
     if smoke_epochs is None:
         res = load_result(ds, arch, method, regime, ipc, seeds)
         if res is not None:
@@ -786,14 +939,7 @@ def eval_cell(ds, arch, method, regime, ipc, seeds, device, smoke_epochs=None):
     set_name = None if method == "full" else build_set(ds, arch, method, ipc, device)
     cell = f"{ds}/{arch}/{method}/{regime}/ipc{ipc}"
     accs, secs = [], []
-    if regime == "kd":
-        for s in seeds:
-            acc, sec = train_once(ds, arch, set_name, "kd", ipc, s, device,
-                                  re_epochs=smoke_epochs, desc=f"{cell} s{s}")
-            accs.append(acc)
-            secs.append(sec)
-            print(f"[cell] {cell} seed{s}: {acc:.2f}%  ({sec:.0f}s)", flush=True)
-    else:
+    if regime != "kd" and len(devices) == 1:  # in-process, setup shared over seeds
         st = hl_sl_setup(ds, arch, set_name, regime, ipc, device)
         for s in seeds:
             acc, sec = hl_sl_seed_run(st, ds, arch, regime, s, device,
@@ -801,6 +947,17 @@ def eval_cell(ds, arch, method, regime, ipc, seeds, device, smoke_epochs=None):
             accs.append(acc)
             secs.append(sec)
             print(f"[cell] {cell} seed{s}: {acc:.2f}%  ({sec:.0f}s)", flush=True)
+    else:
+
+        def job(s, dev):
+            acc, sec = seed_job(ds, arch, set_name, regime, ipc, s, dev,
+                                desc=f"{cell} s{s}", re_epochs=smoke_epochs)
+            print(f"[cell] {cell} seed{s}: {acc:.2f}%  ({sec:.0f}s)", flush=True)
+            return acc, sec
+
+        out = device_pool_map(job, seeds, devices)
+        accs = [a for a, _ in out]
+        secs = [t for _, t in out]
     res = {"dataset": ds, "arch": arch, "method": method, "regime": regime,
            "ipc": ipc, "set": set_name, "seeds": list(seeds), "accs": accs,
            "mean": float(np.mean(accs)), "std": float(np.std(accs)),
@@ -810,21 +967,19 @@ def eval_cell(ds, arch, method, regime, ipc, seeds, device, smoke_epochs=None):
         print(f"[cell] SMOKE ({smoke_epochs} ep, NOT persisted): "
               f"{res['mean']:.2f} +- {res['std']:.2f}")
         return res
-    os.makedirs(RESULT_DIR, exist_ok=True)
-    with open(result_path(ds, arch, method, regime, ipc), "w") as f:
-        json.dump(res, f, indent=2)
+    write_json(result_path(ds, arch, method, regime, ipc), res)
     print(f"[cell] {cell}: {res['mean']:.2f} +- {res['std']:.2f} "
           f"({res['total_secs']:.0f}s)")
     return res
 
 
-def build_el2n_window(ds, arch, ipc, off, device):
+def build_el2n_window(ds, arch, ipc, off, device, devices=None):
     """[B4] per-class descending-EL2N window starting at off% of (pool - ipc)."""
     name = f"bench_{ds}_{arch}_el2nw{off}_ipc{ipc}"
     if os.path.exists(os.path.join(SET_DIR, name + ".pt")):
         return name
     d = BDS[ds]
-    scores = el2n_mean(ds, arch, device).numpy()
+    scores = el2n_mean(ds, arch, device, devices).numpy()
     xtr_u8, ytr = load_train(ds)
     keep = []
     for idx in class_indices(ytr, d["nclass"]):
@@ -835,7 +990,8 @@ def build_el2n_window(ds, arch, ipc, off, device):
     return name
 
 
-def eval_el2nbest(ds, arch, regime, ipc, seeds, device):
+def eval_el2nbest(ds, arch, regime, ipc, seeds, device, devices=None):
+    devices = list(devices or [device])
     res = load_result(ds, arch, "el2nbest", regime, ipc, seeds)
     if res is not None:
         print(f"[cell] cached ({res['path']}): "
@@ -849,34 +1005,64 @@ def eval_el2nbest(ds, arch, regime, ipc, seeds, device):
     if os.path.exists(search_p):
         with open(search_p) as f:
             search = json.load(f)
-    for off in EL2N_OFFSETS:  # [B4] seed-42 search, resumable per window
-        if str(off) in search:
-            continue
-        name = build_el2n_window(ds, arch, ipc, off, device)
-        acc, sec = train_once(ds, arch, name, regime, ipc, seeds[0], device,
-                              desc=f"{cell} w{off} s{seeds[0]}")
-        search[str(off)] = {"acc": acc, "secs": round(sec, 1)}
-        os.makedirs(RESULT_DIR, exist_ok=True)
-        with open(search_p, "w") as f:
-            json.dump(search, f, indent=2)
+    pending = [off for off in EL2N_OFFSETS if str(off) not in search]
+    lock = threading.Lock()
+
+    def save_window(off, acc, sec):
+        with lock:
+            search[str(off)] = {"acc": acc, "secs": round(sec, 1)}
+            write_json(search_p, search)
         print(f"[cell] {cell} window {off}%: {acc:.2f}%  ({sec:.0f}s)", flush=True)
+
+    ss = EL2N_SEARCH_SEED
+    if len(devices) == 1:
+        for off in pending:  # [B4] seed-42 search, resumable per window
+            name = build_el2n_window(ds, arch, ipc, off, device)
+            acc, sec = train_once(ds, arch, name, regime, ipc, ss, device,
+                                  desc=f"{cell} w{off} s{ss}")
+            save_window(off, acc, sec)
+    elif pending:
+        for off in pending:  # windows built once, before the pool
+            build_el2n_window(ds, arch, ipc, off, device, devices)
+
+        def wjob(off, dev):
+            name = build_el2n_window(ds, arch, ipc, off, device)  # cached
+            acc, sec = seed_job(ds, arch, name, regime, ipc, ss, dev,
+                                desc=f"{cell} w{off} s{ss}")
+            save_window(off, acc, sec)
+
+        device_pool_map(wjob, pending, devices)
     best_off = max(search, key=lambda k: search[k]["acc"])
     name = build_el2n_window(ds, arch, ipc, int(best_off), device)
-    accs = [search[best_off]["acc"]]           # seed-42 search result reused
-    secs = [search[best_off]["secs"]]
-    for s in seeds[1:]:
-        acc, sec = train_once(ds, arch, name, regime, ipc, s, device,
-                              desc=f"{cell} s{s}")
-        accs.append(acc)
-        secs.append(round(sec, 1))
+    accs, secs, rest = [], [], [s for s in seeds if s != ss]
+    if ss in seeds:                            # seed-42 search result reused
+        accs = [search[best_off]["acc"]]
+        secs = [search[best_off]["secs"]]
+
+    def rjob(s, dev):
+        acc, sec = seed_job(ds, arch, name, regime, ipc, s, dev,
+                            desc=f"{cell} s{s}")
         print(f"[cell] {cell} seed{s}: {acc:.2f}%  ({sec:.0f}s)", flush=True)
+        return acc, sec
+
+    if len(devices) == 1:
+        for s in rest:
+            acc, sec = train_once(ds, arch, name, regime, ipc, s, device,
+                                  desc=f"{cell} s{s}")
+            accs.append(acc)
+            secs.append(round(sec, 1))
+            print(f"[cell] {cell} seed{s}: {acc:.2f}%  ({sec:.0f}s)", flush=True)
+    else:
+        out = device_pool_map(rjob, rest, devices)
+        accs += [a for a, _ in out]
+        secs += [round(t, 1) for _, t in out]
+    res_seeds = ([ss] if ss in seeds else []) + rest
     res = {"dataset": ds, "arch": arch, "method": "el2nbest", "regime": regime,
            "ipc": ipc, "set": name, "window_offset": int(best_off),
-           "search": search, "seeds": list(seeds), "accs": accs,
+           "search": search, "seeds": res_seeds, "accs": accs,
            "mean": float(np.mean(accs)), "std": float(np.std(accs)),
            "seed_secs": secs, "total_secs": round(time.time() - t_all, 1)}
-    with open(result_path(ds, arch, "el2nbest", regime, ipc), "w") as f:
-        json.dump(res, f, indent=2)
+    write_json(result_path(ds, arch, "el2nbest", regime, ipc), res)
     print(f"[cell] {cell}: {res['mean']:.2f} +- {res['std']:.2f} "
           f"(window {best_off}%)")
     return res
@@ -968,13 +1154,13 @@ def cmd_prepare():
 # --------------------------------------------------------------------------- #
 # run / table / tex / timing
 # --------------------------------------------------------------------------- #
-def cmd_run(table_key, seeds, device, ipcs, regimes, methods):
+def cmd_run(table_key, seeds, device, ipcs, regimes, methods, devices=None):
     ds, arch = TABLES[table_key]
     cells = [(m, r, i) for i in ipcs for r in regimes for m in methods]
     outer = tqdm(cells, desc=table_key, unit="cell", dynamic_ncols=True)
     for m, r, i in outer:
         outer.set_postfix_str(f"{m}/{r}/ipc{i}")
-        eval_cell(ds, arch, m, r, i, seeds, device)
+        eval_cell(ds, arch, m, r, i, seeds, device, devices=devices)
 
 
 COLS9 = [(r, i) for r in REGIMES for i in IPCS]
@@ -992,6 +1178,15 @@ def _cell_res(ds, arch, method, regime, ipc):
     return None if r is None else (r["mean"], r["std"], r["accs"])
 
 
+def seed_count_txt(local):
+    """'3', '3-5' (cells in transition), or '?' — seeds behind the loaded cells."""
+    ns = sorted({len(v[2]) for row in local.values() for v in row.values()
+                 if v is not None})
+    if not ns:
+        return "?"
+    return str(ns[0]) if len(ns) == 1 else f"{ns[0]}-{ns[-1]}"
+
+
 def render_table(table_key):
     ds, arch = TABLES[table_key]
     B, E = "\033[1m", "\033[0m"
@@ -999,17 +1194,18 @@ def render_table(table_key):
     width = 24 + 9 * CW + 2
     stud = {"conv": f"ConvNet-D{3 if ds == 'cifar100' else 4}",
             "rn18": "ResNet-18"}[arch]
+    local = {m: {c: _cell_res(ds, arch, m, c[0], c[1]) for c in COLS9}
+             for m in TABLE_METHODS}
+    ntxt = seed_count_txt(local)
     print("\n" + "=" * width)
     print(f"  {table_key}  ({stud}; HL/SL: DC-bench student, KD: RDED student "
-          f"[B7]; seeds 42-44)")
+          f"[B7]; n={ntxt} seeds)")
     print("=" * width)
     head1 = f"{'':<24}" + "".join(
         f"{t:^{3 * CW}}" for t in ("Hard Label (HL)", "Fixed Soft Label (SL)",
                                    "KD + Soft Label"))
     head2 = f"{'Method':<24}" + "".join(f"{f'IPC {i}':^{CW}}" for _, i in COLS9)
     print(head1 + "\n" + head2)
-    local = {m: {c: _cell_res(ds, arch, m, c[0], c[1]) for c in COLS9}
-             for m in TABLE_METHODS}
     ref = {}  # strongest non-ours local row per column (for daggers on ours)
     for c in COLS9:
         base = {m: v[c][0] for m in ("random", "el2nbest", "cadprune", "rded",
@@ -1040,7 +1236,7 @@ def render_table(table_key):
             print(line)
     print("-" * width)
     print("bold = best per block & column; †/‡ = one-sided Welch p<0.05/0.01 of "
-          "ours vs the strongest\nbaseline in the column (n=3)")
+          f"ours vs the strongest\nbaseline in the column (n={ntxt})")
 
 
 def tex_table(table_key):
@@ -1049,17 +1245,16 @@ def tex_table(table_key):
             "rn18": "ResNet-18"}[arch]
     local = {m: {c: _cell_res(ds, arch, m, c[0], c[1]) for c in COLS9}
              for m in TABLE_METHODS}
+    ntxt = seed_count_txt(local)
     done = sum(v is not None for row in local.values() for v in row.values())
-    ref, best = {}, {}
+    ref = {}  # strongest non-ours baseline per column (global, for the daggers)
     for c in COLS9:
         means = {m: v[c][0] for m, v in local.items() if v[c] is not None}
-        if means:
-            best[c] = max(means.values())
         base = {m: v for m, v in means.items() if m not in OURS}
         if base:
             ref[c] = local[max(base, key=base.get)][c][2]
 
-    def cell(m, c):
+    def cell(m, c, best):
         v = local[m][c]
         if v is None:
             return "--"
@@ -1070,7 +1265,8 @@ def tex_table(table_key):
             star = "$^{\\ddagger}$" if p < 0.01 else \
                 ("$^{\\dagger}$" if p < 0.05 else "")
         txt = f"{mean:.2f}{{\\scriptsize$\\pm${std:.2f}}}{star}"
-        return f"\\textbf{{{txt}}}" if abs(mean - best.get(c, -1)) < 1e-9 else txt
+        return f"\\textbf{{{txt}}}" if best[c] is not None and \
+            abs(mean - best[c]) < 1e-9 else txt
 
     lines = [
         f"% auto-generated by `python bench.py tex` "
@@ -1082,7 +1278,7 @@ def tex_table(table_key):
         "KD+SL training. HL/SL follow the small-scale protocol of Dey et al.; "
         "KD+SL is RDED's official validation (RDED student variant). $\\dagger$/"
         "$\\ddagger$: one-sided Welch $p<0.05$/$0.01$ vs the strongest baseline "
-        "in the column (3 seeds).}",
+        f"in the column ({ntxt} seeds).}}",
         f"\\label{{tab:bench_{table_key.replace('-', '_')}}}",
         "\\resizebox{\\textwidth}{!}{%", "\\begin{tabular}{l ccc ccc ccc}",
         "\\toprule",
@@ -1093,9 +1289,11 @@ def tex_table(table_key):
     ]
     for btitle, ms in BLOCKS:
         lines.append("\\midrule")
+        best = {c: max((local[m][c][0] for m in ms if local[m][c] is not None),
+                       default=None) for c in COLS9}  # best per block & column
         for m in ms:
             pre = "\\textbf{" + LABELS[m] + "}" if m in OURS else LABELS[m]
-            lines.append(f"{pre} & " + " & ".join(cell(m, c) for c in COLS9)
+            lines.append(f"{pre} & " + " & ".join(cell(m, c, best) for c in COLS9)
                          + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}}", "\\end{table*}"]
     os.makedirs(TEX_DIR, exist_ok=True)
@@ -1124,6 +1322,239 @@ def cmd_timing():
         if "seed_secs" in r:
             print(f"{f[6:-5]:<58}{fmt_dur(np.mean(r['seed_secs'])):>12}"
                   f"{fmt_dur(r['total_secs']):>10}")
+
+
+# --------------------------------------------------------------------------- #
+# merge / launch — multi-server seed extension (see RUNBOOK-seeds.md)
+# --------------------------------------------------------------------------- #
+def cmd_merge(dirs, dry_run=False):
+    """Fold result dirs copied from other machines into RESULT_DIR, unioning
+    the per-cell seed lists with the local (canonical or legacy) results.
+    Order-independent; duplicate seeds with differing accs are a hard error."""
+    incoming, searches = {}, {}   # basename -> [(src_dir, res)] / first-wins
+    for d in dirs:
+        d = d.rstrip("/")
+        assert os.path.isdir(d), f"[merge] not a directory: {d}"
+        for fn in sorted(os.listdir(d)):
+            if not (fn.startswith("bench_") and fn.endswith(".json")):
+                continue
+            with open(os.path.join(d, fn)) as f:
+                r = json.load(f)
+            if "seeds" in r:              # per-cell result
+                incoming.setdefault(fn, []).append((d, r))
+            else:                         # el2nsearch cache (seed-42, det.)
+                searches.setdefault(fn, r)
+    tag = "DRY " if dry_run else ""
+    n_new = n_same = 0
+    for fn in sorted(incoming):
+        r0 = incoming[fn][0][1]
+        ds, arch = r0["dataset"], r0["arch"]
+        method, regime, ipc = r0["method"], r0["regime"], r0["ipc"]
+        cell = f"{ds}/{arch}/{method}/{regime}/ipc{ipc}"
+        entries = [(d, r) for d, r in incoming[fn]]
+        loc = load_result(ds, arch, method, regime, ipc)
+        if loc is not None:
+            entries.insert(0, (f"local:{loc['path']}", loc))
+        pool, sets, offs = {}, set(), set()   # seed -> [acc, secs|None]
+        for origin, r in entries:
+            if r.get("set"):
+                sets.add(r["set"])
+            if "window_offset" in r:
+                offs.add(r["window_offset"])
+            secs = r.get("seed_secs") or [None] * len(r["accs"])
+            for s, a, t in zip(r["seeds"], r["accs"], secs):
+                if s in pool and pool[s][0] != a:
+                    sys.exit(f"[merge] CONFLICT {cell} seed {s}: "
+                             f"acc {pool[s][0]} vs {a} (from {origin})")
+                pool.setdefault(s, [a, t])
+        if len(sets) > 1:
+            sys.exit(f"[merge] CONFLICT {cell}: set names {sorted(sets)}")
+        if len(offs) > 1:
+            sys.exit(f"[merge] CONFLICT {cell}: window offsets {sorted(offs)}")
+        old = sorted(loc["seeds"]) if loc else []
+        seeds = sorted(pool)
+        if seeds == old:
+            n_same += 1
+            continue
+        accs = [pool[s][0] for s in seeds]
+        res = {"dataset": ds, "arch": arch, "method": method, "regime": regime,
+               "ipc": ipc, "set": sorted(sets)[0] if sets else None}
+        if offs:
+            res["window_offset"] = sorted(offs)[0]
+        for origin, r in entries:
+            if "search" in r:
+                res["search"] = r["search"]
+                break
+        res.update(seeds=seeds, accs=accs, mean=float(np.mean(accs)),
+                   std=float(np.std(accs)))
+        secs = [pool[s][1] for s in seeds]
+        if all(t is not None for t in secs):
+            res["seed_secs"] = [round(float(t), 1) for t in secs]
+            res["total_secs"] = round(sum(res["seed_secs"]), 1)
+        print(f"[merge] {tag}{cell}: seeds {old} -> {seeds}  "
+              f"{res['mean']:.2f} +- {res['std']:.2f}")
+        if not dry_run:
+            write_json(result_path(ds, arch, method, regime, ipc), res)
+        n_new += 1
+    for fn, r in sorted(searches.items()):
+        dst = os.path.join(RESULT_DIR, fn)
+        if os.path.exists(dst):
+            continue
+        print(f"[merge] {tag}copy {fn}")
+        if not dry_run:
+            write_json(dst, r)
+    print(f"[merge] {tag}{n_new} cell(s) updated, {n_same} unchanged")
+
+
+def _pump(job, proc, log_path, done_re):
+    """Mirror a launch job's merged stdout/stderr to its log; echo [cell] lines
+    (tqdm frames are \\r-separated, so split on both \\r and \\n)."""
+    buf = b""
+    with open(log_path, "ab") as log:
+        while True:
+            chunk = proc.stdout.read1(4096)
+            if not chunk:
+                break
+            buf += chunk
+            *lines, buf = re.split(rb"[\r\n]", buf)
+            for ln in lines:
+                log.write(ln + b"\n")
+                txt = ln.decode(errors="replace")
+                if done_re.match(txt):
+                    job["done"] += 1
+                if txt.startswith("[cell]"):
+                    print(f"[{job['name']} {job['done']}/{job['total']}] "
+                          f"{txt}", flush=True)
+            log.flush()
+        if buf:
+            log.write(buf + b"\n")
+
+
+def cmd_launch(plan_path, dry_run=False):
+    """Run a YAML manifest of jobs, one `bench.py run` subprocess per job.
+    Refuses to start unless jobs are pairwise disjoint in cells and devices."""
+    import yaml
+    with open(plan_path) as f:
+        plan = yaml.safe_load(f) or {}
+    if not isinstance(plan.get("jobs"), list) or not plan["jobs"]:
+        sys.exit(f"[launch] {plan_path}: top-level 'jobs' list required")
+    known = {"name", "table", "seeds", "devices", "methods", "regimes", "ipcs"}
+    errors, warns, jobs = [], {}, []
+    for i, j in enumerate(plan["jobs"]):
+        if not isinstance(j, dict):
+            errors.append(f"jobs[{i}]: not a mapping")
+            continue
+        name = str(j.get("name", f"job{i}"))
+        who = f"jobs[{i}] ({name})"
+        if set(j) - known:
+            errors.append(f"{who}: unknown key(s) {sorted(set(j) - known)}")
+        if j.get("table") not in TABLES:
+            errors.append(f"{who}: 'table' must be one of {list(TABLES)}")
+            continue
+        seeds, devices = j.get("seeds"), j.get("devices")
+        if not (isinstance(seeds, list) and seeds
+                and all(isinstance(s, int) for s in seeds)):
+            errors.append(f"{who}: 'seeds' must be a non-empty list of ints")
+        if not (isinstance(devices, list) and devices):
+            errors.append(f"{who}: 'devices' must be a non-empty list")
+        sub = {"methods": [m for m in METHODS if m != "full"],
+               "regimes": list(REGIMES), "ipcs": list(IPCS)}
+        for key, opts in (("methods", METHODS), ("regimes", REGIMES),
+                          ("ipcs", IPCS)):
+            v = j.get(key, sub[key])
+            if isinstance(v, list) and v and all(x in opts for x in v):
+                sub[key] = v
+            else:
+                errors.append(f"{who}: '{key}' must be a non-empty subset of "
+                              f"{list(opts)}")
+        jobs.append(dict(name=name, table=j["table"], seeds=seeds,
+                         devices=devices, done=0, **sub))
+    seen_name, seen_dev, seen_cell, seen_sel, overlaps = {}, {}, {}, {}, {}
+    for j in jobs:
+        if j["name"] in seen_name:
+            errors.append(f"duplicate job name '{j['name']}'")
+        seen_name[j["name"]] = j
+        for d in j["devices"] or []:
+            if d in seen_dev:
+                errors.append(f"jobs '{seen_dev[d]}' and '{j['name']}' share "
+                              f"device {d}")
+            seen_dev[d] = j["name"]
+        ds, arch = TABLES[j["table"]]
+        for m in j["methods"]:
+            for r in j["regimes"]:
+                for i in j["ipcs"]:
+                    c = (ds, arch, m, r, i)
+                    if c in seen_cell:
+                        overlaps.setdefault((seen_cell[c], j["name"]),
+                                            []).append(c)
+                    seen_cell[c] = j["name"]
+            for i in j["ipcs"]:
+                for m2 in j["methods"]:
+                    k = (ds, arch, m2, i)
+                    if k in seen_sel and seen_sel[k] != j["name"]:
+                        warns.setdefault((seen_sel[k], j["name"]),
+                                         []).append(k)
+                    seen_sel[k] = j["name"]
+    for (a, b), cs in overlaps.items():
+        errors.append(f"jobs '{a}' and '{b}' share {len(cs)} cell(s), e.g. "
+                      f"{cs[0]} (both would write "
+                      f"{os.path.basename(result_path(*cs[0]))})")
+    for (a, b), ks in warns.items():
+        print(f"[launch] WARNING: jobs '{a}' and '{b}' share {len(set(ks))} "
+              f"selection cache(s), e.g. {ks[0]}: safe only if artifacts/"
+              f"sets+scores are prewarmed (rsynced)")
+    if errors:
+        for e in errors:
+            print(f"[launch] ERROR: {e}")
+        sys.exit(1)
+    for j in jobs:
+        ds, arch = TABLES[j["table"]]
+        cells = [(m, r, i) for i in j["ipcs"] for r in j["regimes"]
+                 for m in j["methods"]]
+        j["total"] = len(cells)
+        cached = sum(load_result(ds, arch, m, r, i, j["seeds"]) is not None
+                     for m, r, i in cells)
+        j["cmd"] = [sys.executable, os.path.abspath(__file__), "run",
+                    "--table", j["table"],
+                    "--seeds", ",".join(map(str, j["seeds"])),
+                    "--device", j["devices"][0],
+                    "--devices", ",".join(j["devices"]),
+                    "--methods", ",".join(j["methods"]),
+                    "--regimes", ",".join(j["regimes"]),
+                    "--ipcs", ",".join(map(str, j["ipcs"]))]
+        print(f"[launch] {j['name']}: {cached}/{j['total']} cells cached\n"
+              f"         {' '.join(j['cmd'])}")
+    if dry_run:
+        return
+    os.makedirs(LOG_DIR, exist_ok=True)
+    done_re = re.compile(r"^\[cell\] (cached|\S+:)")
+    procs = []
+    for j in jobs:
+        log = os.path.join(LOG_DIR, f"launch_{j['name']}.log")
+        p = subprocess.Popen(j["cmd"], stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, cwd=ROOT)
+        t = threading.Thread(target=_pump, args=(j, p, log, done_re),
+                             daemon=True)
+        t.start()
+        procs.append((j, p, t, log))
+        print(f"[launch] {j['name']}: pid {p.pid}, log {log}")
+    fails = []
+    try:
+        for j, p, t, log in procs:
+            rc = p.wait()
+            t.join()
+            status = "ok" if rc == 0 else f"FAILED rc={rc}"
+            print(f"[launch] {j['name']}: {status} "
+                  f"({j['done']}/{j['total']} cells; log {log})")
+            if rc:
+                fails.append(j["name"])
+    except KeyboardInterrupt:
+        print("\n[launch] interrupted -- terminating jobs")
+        for _, p, _, _ in procs:
+            p.terminate()
+        sys.exit(130)
+    if fails:
+        sys.exit(f"[launch] failed job(s): {', '.join(fails)}")
 
 
 # --------------------------------------------------------------------------- #
@@ -1247,7 +1678,11 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=["selftest", "prepare", "score", "el2n",
                                     "select", "export", "cell", "run", "table",
-                                    "tex", "timing", "rded-worker"])
+                                    "tex", "timing", "launch", "merge",
+                                    "rded-worker", "seed-worker"])
+    ap.add_argument("paths", nargs="*",
+                    help="merge: result dir(s) copied from other machines; "
+                         "launch: one plan yaml")
     ap.add_argument("--ds", choices=list(BDS))
     ap.add_argument("--arch", choices=["conv", "rn18"])
     ap.add_argument("--method", choices=list(METHODS))
@@ -1255,7 +1690,7 @@ def main():
     ap.add_argument("--ipc", type=int, choices=list(IPCS))
     ap.add_argument("--table", choices=list(TABLES))
     ap.add_argument("--seeds", type=lambda s: [int(v) for v in s.split(",")],
-                    default=[42, 43, 44])
+                    default=[42, 43, 44, 45, 46])
     ap.add_argument("--ipcs", type=lambda s: [int(v) for v in s.split(",")],
                     default=list(IPCS))
     ap.add_argument("--regimes", type=lambda s: s.split(","),
@@ -1263,8 +1698,14 @@ def main():
     ap.add_argument("--methods", type=lambda s: s.split(","),
                     default=[m for m in METHODS if m != "full"])
     ap.add_argument("--device", default="cuda:1")
+    ap.add_argument("--devices", type=lambda s: s.split(","), default=None,
+                    help="comma list of CUDA devices (run/cell/el2n): training "
+                         "seeds / EL2N runs / window searches go one-per-GPU in "
+                         "subprocesses; per-seed results byte-identical")
     ap.add_argument("--smoke-epochs", type=int, default=None,
                     help="cell only: reduced KD epochs; result NOT persisted")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="launch/merge: preview without running/writing")
     ap.add_argument("--cfg", help="rded-worker only: cfg json path")
     ap.add_argument("--selfcheck", action="store_true",
                     help="rded-worker only: import shim check")
@@ -1275,6 +1716,14 @@ def main():
 
     torch.backends.cudnn.deterministic = True   # repo convention (non-KD paths;
     torch.backends.cudnn.benchmark = False      # the worker keeps RDED's own flags)
+    if args.cmd == "seed-worker":               # pinned via CUDA_VISIBLE_DEVICES
+        return cmd_seed_worker(args.cfg)
+    if args.cmd == "merge":
+        assert args.paths, "merge: give result dir(s) copied from servers"
+        return cmd_merge(args.paths, args.dry_run)
+    if args.cmd == "launch":
+        assert len(args.paths) == 1, "launch: give exactly one plan yaml"
+        return cmd_launch(args.paths[0], args.dry_run)
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
 
     if args.cmd == "selftest":
@@ -1286,7 +1735,7 @@ def main():
         score_blob(args.ds, args.arch, args.ipc, device)
     elif args.cmd == "el2n":
         assert args.ds and args.arch
-        el2n_mean(args.ds, args.arch, device)
+        el2n_mean(args.ds, args.arch, device, args.devices)
     elif args.cmd == "select":
         assert args.ds and args.arch and args.method and args.ipc
         print(build_set(args.ds, args.arch, args.method, args.ipc, device))
@@ -1297,11 +1746,12 @@ def main():
     elif args.cmd == "cell":
         assert args.ds and args.arch and args.method and args.regime and args.ipc
         eval_cell(args.ds, args.arch, args.method, args.regime, args.ipc,
-                  args.seeds, device, smoke_epochs=args.smoke_epochs)
+                  args.seeds, device, smoke_epochs=args.smoke_epochs,
+                  devices=args.devices)
     elif args.cmd == "run":
         assert args.table, "--table required"
         cmd_run(args.table, args.seeds, device, args.ipcs, args.regimes,
-                args.methods)
+                args.methods, devices=args.devices)
     elif args.cmd == "table":
         for t in ([args.table] if args.table else list(TABLES)):
             render_table(t)

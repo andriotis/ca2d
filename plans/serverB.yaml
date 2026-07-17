@@ -1,0 +1,10 @@
+# Example: second server takes the TinyImageNet tables. See serverA.yaml for rules.
+jobs:
+  - name: tin-conv-s45s46
+    table: conv-tin
+    seeds: [45, 46]
+    devices: [cuda:0, cuda:1]
+  - name: tin-rn18-s45s46
+    table: rn18-tin
+    seeds: [45, 46]
+    devices: [cuda:2, cuda:3]

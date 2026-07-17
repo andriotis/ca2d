@@ -1,0 +1,331 @@
+\documentclass[aspectratio=169]{beamer}
+
+% Encoding and fonts (mirrors the template)
+\usepackage[T1]{fontenc}
+
+% Core packages
+\usepackage{hyperref}
+\usepackage{amsmath, amssymb, latexsym}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{adjustbox}
+\usepackage{caption}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit, backgrounds}
+
+% Citation styling (kept for template parity; unused in a 2-slide deck)
+\usepackage[square,numbers]{natbib}
+\bibliographystyle{unsrtnat}
+
+% --- palette ---
+\definecolor{gadcblue}{RGB}{31,90,140}
+\definecolor{gadcgreen}{RGB}{34,120,70}
+\definecolor{gadcred}{RGB}{170,40,40}
+\definecolor{gadcgray}{RGB}{90,90,90}
+\definecolor{boxbg}{RGB}{238,243,248}
+
+% --- reusable tikz styles ---
+\tikzset{
+    stage/.style={rectangle, rounded corners=3pt, draw=gadcblue!70, fill=boxbg,
+                  line width=0.7pt, align=center, inner sep=4pt, font=\scriptsize},
+    term/.style={rectangle, rounded corners=2pt, draw=gadcgreen!70, fill=gadcgreen!8,
+                 align=center, inner sep=3pt, font=\tiny},
+    flow/.style={-{Stealth[length=2mm]}, line width=0.8pt, draw=gadcgray},
+}
+
+% Metadata
+\title{Geometry-Aware Dataset Condensation\\ for Diffusion Model Training}
+\subtitle{Reading guide: the gap, the pipeline, and a worked example}
+\author{Nikolaos Andriotis}
+\institute{Aristotle University of Thessaloniki}
+\date{\today}
+
+\begin{document}
+
+% ============================================================
+% BENCHMARK RESULTS (bench.py) --- snapshot 2026-07-15
+% Numbers pasted verbatim from `python bench.py tex` (tex/bench_*.tex);
+% re-run that command and re-paste to refresh.
+% ============================================================
+
+
+% ------------------------------------------------------------
+% Table 1/4 --- CIFAR-100 x ConvNet-D3 (complete)
+% ------------------------------------------------------------
+\begin{frame}{Results 1/4 --- CIFAR-100 $\times$ ConvNet-D3 \hfill {\small 81/81 cells}}
+    \vspace{-0.15cm}
+    \begin{center}
+    \adjustbox{max width=\linewidth}{%
+    \begin{tabular}{l ccc ccc ccc}
+    \toprule
+     & \multicolumn{3}{c}{Hard Label (HL)} & \multicolumn{3}{c}{Fixed Soft Label (SL)} & \multicolumn{3}{c}{KD + Soft Label} \\
+    \cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10}
+    Method & IPC 10 & IPC 50 & IPC 100 & IPC 10 & IPC 50 & IPC 100 & IPC 10 & IPC 50 & IPC 100 \\
+    \midrule
+    Random Real & 16.44{\scriptsize$\pm$0.05} & 33.42{\scriptsize$\pm$0.18} & 40.83{\scriptsize$\pm$0.17} & 26.17{\scriptsize$\pm$0.08} & 43.88{\scriptsize$\pm$0.30} & 49.85{\scriptsize$\pm$0.26} & 50.23{\scriptsize$\pm$0.22} & 57.92{\scriptsize$\pm$0.16} & 58.89{\scriptsize$\pm$0.23} \\
+    EL2N-Best & 22.84{\scriptsize$\pm$0.22} & 39.69{\scriptsize$\pm$0.16} & \textbf{46.50{\scriptsize$\pm$0.19}} & 28.82{\scriptsize$\pm$0.22} & 44.48{\scriptsize$\pm$0.01} & 50.00{\scriptsize$\pm$0.24} & 50.85{\scriptsize$\pm$0.08} & \textbf{58.48{\scriptsize$\pm$0.13}} & \textbf{58.99{\scriptsize$\pm$0.16}} \\
+    CAD-Prune & 21.92{\scriptsize$\pm$0.21} & 37.14{\scriptsize$\pm$0.08} & 39.61{\scriptsize$\pm$0.38} & 27.73{\scriptsize$\pm$0.13} & 43.80{\scriptsize$\pm$0.39} & 49.38{\scriptsize$\pm$0.16} & 50.20{\scriptsize$\pm$0.36} & 58.19{\scriptsize$\pm$0.12} & 58.63{\scriptsize$\pm$0.14} \\
+    \textbf{SHARP (ours)} & 24.18{\scriptsize$\pm$0.12}$^{\ddagger}$ & 38.09{\scriptsize$\pm$0.35} & 42.84{\scriptsize$\pm$0.11} & 30.66{\scriptsize$\pm$0.07}$^{\ddagger}$ & 45.87{\scriptsize$\pm$0.43}$^{\dagger}$ & \textbf{50.89{\scriptsize$\pm$0.16}$^{\ddagger}$} & \textbf{50.99{\scriptsize$\pm$0.38}} & 58.17{\scriptsize$\pm$0.16} & 58.91{\scriptsize$\pm$0.14} \\
+    \textbf{R-CAD (ours)} & \textbf{26.08{\scriptsize$\pm$0.21}$^{\ddagger}$} & \textbf{41.61{\scriptsize$\pm$0.20}$^{\ddagger}$} & 44.19{\scriptsize$\pm$0.29} & \textbf{31.02{\scriptsize$\pm$0.36}$^{\ddagger}$} & \textbf{46.41{\scriptsize$\pm$0.43}$^{\dagger}$} & 50.61{\scriptsize$\pm$0.19}$^{\dagger}$ & 50.72{\scriptsize$\pm$0.08} & 58.24{\scriptsize$\pm$0.05} & 58.72{\scriptsize$\pm$0.13} \\
+    \midrule
+    RDED & 20.96{\scriptsize$\pm$0.21} & 35.38{\scriptsize$\pm$0.26} & 40.67{\scriptsize$\pm$0.35} & 26.15{\scriptsize$\pm$0.16} & 40.19{\scriptsize$\pm$0.13} & 44.91{\scriptsize$\pm$0.42} & 48.53{\scriptsize$\pm$0.25} & 57.28{\scriptsize$\pm$0.18} & 58.22{\scriptsize$\pm$0.15} \\
+    CA2D & 20.94{\scriptsize$\pm$0.18} & 35.80{\scriptsize$\pm$0.22} & 41.90{\scriptsize$\pm$0.10} & 26.66{\scriptsize$\pm$0.16} & 40.55{\scriptsize$\pm$0.30} & 45.72{\scriptsize$\pm$0.38} & 48.44{\scriptsize$\pm$0.51} & 57.25{\scriptsize$\pm$0.49} & \textbf{58.38{\scriptsize$\pm$0.26}} \\
+    \textbf{SHARP-2D (ours)} & 21.32{\scriptsize$\pm$0.25} & 35.26{\scriptsize$\pm$0.40} & 41.18{\scriptsize$\pm$0.24} & 26.48{\scriptsize$\pm$0.22} & 40.63{\scriptsize$\pm$0.29} & 45.27{\scriptsize$\pm$0.05} & \textbf{49.23{\scriptsize$\pm$0.06}} & 57.40{\scriptsize$\pm$0.13} & 58.28{\scriptsize$\pm$0.11} \\
+    \textbf{R-CAD-2D (ours)} & \textbf{21.42{\scriptsize$\pm$0.35}} & \textbf{35.98{\scriptsize$\pm$0.23}} & \textbf{42.28{\scriptsize$\pm$0.16}} & \textbf{26.75{\scriptsize$\pm$0.31}} & \textbf{40.84{\scriptsize$\pm$0.25}} & \textbf{45.75{\scriptsize$\pm$0.07}} & 49.16{\scriptsize$\pm$0.34} & \textbf{57.55{\scriptsize$\pm$0.30}} & 58.34{\scriptsize$\pm$0.03} \\
+    \bottomrule
+    \end{tabular}}
+    \end{center}
+    \vspace{-0.05cm}
+{\tiny \textbf{Caption.} Cells = test top-1 (\%), mean$\pm$std over seeds
+\{42,43,44\}; \textbf{bold} = column best; $\dagger$/$\ddagger$ = one-sided Welch $p{<}0.05$/$0.01$ vs
+the strongest baseline in the column. The images in a row are chosen \emph{once} --- from a single seed-0
+full-dataset scoring run --- and the \emph{identical} set is then trained three ways across the row. Selection is redone per budget, so IPC 10/50/100 are \emph{three different image sets}, not nested.
+Every method picks from the same fixed \textbf{500-image-per-class candidate pool} (here = the whole
+class); the IPC-sized subset is carved out of it. HL/SL
+train the DC-bench \emph{instance-norm} ConvNet-D3 (the same family that did the scoring/selection),
+while KD+SL trains RDED's own \emph{batch-norm} conv3 --- so KD is the one column where the trained net
+differs from the net that picked the images.}
+\end{frame}
+
+% ------------------------------------------------------------
+% Table 2/4 --- CIFAR-100 x ResNet-18 (partial)
+% ------------------------------------------------------------
+\begin{frame}{Results 2/4 --- CIFAR-100 $\times$ ResNet-18 \hfill {\small 17/81 cells, in progress}}
+    \vspace{-0.15cm}
+    \begin{center}
+    \adjustbox{max width=\linewidth}{%
+    \begin{tabular}{l ccc ccc ccc}
+    \toprule
+     & \multicolumn{3}{c}{Hard Label (HL)} & \multicolumn{3}{c}{Fixed Soft Label (SL)} & \multicolumn{3}{c}{KD + Soft Label} \\
+    \cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10}
+    Method & IPC 10 & IPC 50 & IPC 100 & IPC 10 & IPC 50 & IPC 100 & IPC 10 & IPC 50 & IPC 100 \\
+    \midrule
+    Random Real & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    EL2N-Best & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    CAD-Prune & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \textbf{SHARP (ours)} & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \textbf{R-CAD (ours)} & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \midrule
+    RDED & 12.72{\scriptsize$\pm$0.28} & 27.13{\scriptsize$\pm$0.10} & -- & 21.12{\scriptsize$\pm$0.65} & \textbf{38.30{\scriptsize$\pm$0.34}} & -- & 44.71{\scriptsize$\pm$0.50} & -- & -- \\
+    CA2D & 13.48{\scriptsize$\pm$0.41} & 27.36{\scriptsize$\pm$0.19} & -- & 21.30{\scriptsize$\pm$0.05} & -- & -- & 44.50{\scriptsize$\pm$1.07} & -- & -- \\
+    \textbf{SHARP-2D (ours)} & 12.89{\scriptsize$\pm$0.21} & 26.45{\scriptsize$\pm$0.70} & -- & 20.36{\scriptsize$\pm$0.13} & -- & -- & \textbf{44.77{\scriptsize$\pm$0.98}} & -- & -- \\
+    \textbf{R-CAD-2D (ours)} & \textbf{13.83{\scriptsize$\pm$0.05}} & \textbf{28.44{\scriptsize$\pm$0.27}$^{\ddagger}$} & -- & \textbf{21.59{\scriptsize$\pm$0.31}} & -- & -- & 44.43{\scriptsize$\pm$0.53} & -- & -- \\
+    \bottomrule
+    \end{tabular}}
+    \end{center}
+    \vspace{-0.05cm}
+{\tiny \textbf{Caption.} Cells = test top-1 (\%), mean$\pm$std over seeds
+\{42,43,44\}; \textbf{bold} = column best; $\dagger$/$\ddagger$ = one-sided Welch $p{<}0.05$/$0.01$ vs
+the strongest baseline in the column. The images in a row are chosen \emph{once} --- from a single seed-0}
+\end{frame}
+
+% ------------------------------------------------------------
+% Table 3/4 --- TinyImageNet x ConvNet-D4 (partial)
+% ------------------------------------------------------------
+\begin{frame}{Results 3/4 --- TinyImageNet $\times$ ConvNet-D4 \hfill {\small 35/81 cells, in progress}}
+    \vspace{-0.15cm}
+    \begin{center}
+    \adjustbox{max width=\linewidth}{%
+    \begin{tabular}{l ccc ccc ccc}
+    \toprule
+     & \multicolumn{3}{c}{Hard Label (HL)} & \multicolumn{3}{c}{Fixed Soft Label (SL)} & \multicolumn{3}{c}{KD + Soft Label} \\
+    \cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10}
+    Method & IPC 10 & IPC 50 & IPC 100 & IPC 10 & IPC 50 & IPC 100 & IPC 10 & IPC 50 & IPC 100 \\
+    \midrule
+    Random Real & 6.33{\scriptsize$\pm$0.14} & 17.30{\scriptsize$\pm$0.17} & -- & 14.77{\scriptsize$\pm$0.23} & 32.19{\scriptsize$\pm$0.14} & -- & -- & -- & -- \\
+    EL2N-Best & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    CAD-Prune & 12.11{\scriptsize$\pm$0.16} & \textbf{27.83{\scriptsize$\pm$0.18}} & -- & 18.16{\scriptsize$\pm$0.03} & 33.46{\scriptsize$\pm$0.16} & -- & -- & -- & -- \\
+    \textbf{SHARP (ours)} & 11.52{\scriptsize$\pm$0.16} & 21.76{\scriptsize$\pm$0.22} & -- & 18.17{\scriptsize$\pm$0.10} & 34.09{\scriptsize$\pm$0.12} & -- & -- & -- & -- \\
+    \textbf{R-CAD (ours)} & \textbf{13.14{\scriptsize$\pm$0.54}} & 27.66{\scriptsize$\pm$0.29} & -- & \textbf{19.20{\scriptsize$\pm$0.46}$^{\dagger}$} & \textbf{34.21{\scriptsize$\pm$0.09}} & -- & -- & -- & -- \\
+    \midrule
+    RDED & 10.41{\scriptsize$\pm$0.24} & 22.97{\scriptsize$\pm$0.48} & -- & 17.65{\scriptsize$\pm$0.46} & 33.90{\scriptsize$\pm$0.18} & -- & \textbf{40.12{\scriptsize$\pm$0.42}} & -- & -- \\
+    CA2D & 10.44{\scriptsize$\pm$0.04} & \textbf{23.77{\scriptsize$\pm$0.47}} & -- & 17.73{\scriptsize$\pm$0.50} & 33.62{\scriptsize$\pm$0.16} & -- & 39.82{\scriptsize$\pm$0.10} & -- & -- \\
+    \textbf{SHARP-2D (ours)} & \textbf{10.74{\scriptsize$\pm$0.18}} & 23.02{\scriptsize$\pm$0.29} & -- & 17.88{\scriptsize$\pm$0.12} & \textbf{33.96{\scriptsize$\pm$0.48}} & -- & 39.80{\scriptsize$\pm$0.17} & -- & -- \\
+    \textbf{R-CAD-2D (ours)} & 10.67{\scriptsize$\pm$0.10} & 23.65{\scriptsize$\pm$0.05} & -- & \textbf{18.43{\scriptsize$\pm$0.62}} & -- & -- & 39.64{\scriptsize$\pm$0.25} & -- & -- \\
+    \bottomrule
+    \end{tabular}}
+    \end{center}
+    \vspace{-0.05cm}
+{\tiny \textbf{Caption.} Cells = test top-1 (\%), mean$\pm$std over seeds
+\{42,43,44\}; \textbf{bold} = column best; $\dagger$/$\ddagger$ = one-sided Welch $p{<}0.05$/$0.01$ vs
+the strongest baseline in the column. The images in a row are chosen \emph{once} --- from a single seed-0}
+\end{frame}
+
+% ------------------------------------------------------------
+% Table 4/4 --- TinyImageNet x ResNet-18 (partial)
+% ------------------------------------------------------------
+\begin{frame}{Results 4/4 --- TinyImageNet $\times$ ResNet-18 \hfill {\small 15/81 cells, in progress}}
+    \vspace{-0.15cm}
+    \begin{center}
+    \adjustbox{max width=\linewidth}{%
+    \begin{tabular}{l ccc ccc ccc}
+    \toprule
+     & \multicolumn{3}{c}{Hard Label (HL)} & \multicolumn{3}{c}{Fixed Soft Label (SL)} & \multicolumn{3}{c}{KD + Soft Label} \\
+    \cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10}
+    Method & IPC 10 & IPC 50 & IPC 100 & IPC 10 & IPC 50 & IPC 100 & IPC 10 & IPC 50 & IPC 100 \\
+    \midrule
+    Random Real & \textbf{5.27{\scriptsize$\pm$0.37}} & -- & -- & -- & -- & -- & -- & -- & -- \\
+    EL2N-Best & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    CAD-Prune & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \textbf{SHARP (ours)} & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \textbf{R-CAD (ours)} & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \midrule
+    RDED & 6.23{\scriptsize$\pm$0.23} & 17.78{\scriptsize$\pm$1.21} & -- & \textbf{13.39{\scriptsize$\pm$0.68}} & -- & -- & 43.66{\scriptsize$\pm$0.72} & -- & -- \\
+    CA2D & \textbf{6.44{\scriptsize$\pm$0.22}} & \textbf{19.71{\scriptsize$\pm$0.71}} & -- & 13.33{\scriptsize$\pm$0.66} & -- & -- & \textbf{44.18{\scriptsize$\pm$0.36}} & -- & -- \\
+    \textbf{SHARP-2D (ours)} & 6.43{\scriptsize$\pm$0.11} & -- & -- & 12.79{\scriptsize$\pm$0.29} & -- & -- & 43.57{\scriptsize$\pm$0.34} & -- & -- \\
+    \textbf{R-CAD-2D (ours)} & 6.34{\scriptsize$\pm$0.68} & -- & -- & 13.26{\scriptsize$\pm$0.79} & -- & -- & 43.91{\scriptsize$\pm$0.57} & -- & -- \\
+    \bottomrule
+    \end{tabular}}
+    \end{center}
+    \vspace{-0.05cm}
+{\tiny \textbf{Caption.} Cells = test top-1 (\%), mean$\pm$std over seeds
+\{42,43,44\}; \textbf{bold} = column best; $\dagger$/$\ddagger$ = one-sided Welch $p{<}0.05$/$0.01$ vs
+the strongest baseline in the column. The images in a row are chosen \emph{once} --- from a single seed-0}
+\end{frame}
+% ------------------------------------------------------------
+% Implicit choices [B1]-[B10] (SETUP.md Sec.6)
+% ------------------------------------------------------------
+\begin{frame}{The ten implicit choices [B1]--[B10]: where the papers are silent, we decide}
+
+    {\small Every decision the source papers leave undefined or ambiguous is pinned, annotated at its
+    point of use in the code, and cited in the table captions.}
+
+    \vspace{0.05cm}
+    \begin{center}
+    \adjustbox{max width=\linewidth}{%
+    \tiny
+    \begin{tabular}{@{}l p{8.4cm} p{5.6cm}@{}}
+    \toprule
+    ID & Decision & Why / citation \\
+    \midrule
+    \textbf{B1} & Small-scale KD+SL = RDED's official validation code, run unmodified. &
+        [HT] does not define small-scale KD+SL; RDED's is the canonical on-the-fly KD recipe. \\
+    \textbf{B2} & KD IPC-100 batch size: CIFAR-100 = 200, TinyImageNet = 100. &
+        RDED has no IPC-100 rule; CIFAR from [HT Tab.4] large-scale HL IPC-100, TIN = RDED's single all-IPC rule. \\
+    \textbf{B3} & EL2N = mean over 10 runs (seeds 1000--1009) of $\lVert\mathrm{softmax}-\mathrm{onehot}\rVert_2$
+        at epoch 20 of the truncated HL recipe, table-arch student. &
+        [DD Def.2.3]; DD README ``$\geq$ 10 runs''; epoch-20 = DD Fig.1 early-epoch convention. \\
+    \textbf{B4} & EL2N-Best window: start offsets $\{0,10,\dots,90\}\%$ of (pool$-$IPC) over the per-class
+        descending ranking; winner by \textcolor{gadcred}{\textbf{test}} accuracy; search at seed 42 only,
+        winner re-run at 3 seeds. &
+        [HT] implicitly selects the window by test accuracy --- flagged in the paper text. \\
+    \textbf{B5} & Coresets exported as PNG for the KD path; synthesized sets keep official JPEG. &
+        Measured JPEG re-encoding cost: 1.6--3.1 pp teacher top-1 at 32 px. \\
+    \textbf{B6} & Full-Dataset reference rows compute-matched: epochs = 6/30/60, schedules compressed
+        proportionally; in KD the best-acc window degenerates to the final-epoch validation. Not shown in tables. &
+        [HT Sec.5] compute-matching. \\
+    \textbf{B7} & Per-column student convention: DC-bench students for HL/SL, RDED students for KD. &
+        Comparability to [HT Tab.2/6/11] for HL/SL; forced by B1 for KD. \\
+    \textbf{B8} & Scoring run = single seed-0 run (no averaging over scoring seeds). &
+        [HT] is silent on scoring-run averaging. \\
+    \textbf{B9} & RDED synthesis via official \texttt{synthesize/main.py}; the worker seeds
+        python/numpy/torch with 0. &
+        Determinism; stock RDED leaves the pool-shuffle / crop RNG unseeded. \\
+    \textbf{B10} & Random rows: one fixed class-balanced draw (\texttt{RandomState(0)}) $\times$ 3 training seeds. &
+        Isolates training-seed variance from draw variance. \\
+    \bottomrule
+    \end{tabular}}
+    \end{center}
+
+\end{frame}
+
+\begin{frame}{The pipeline: one seed-0 scoring run $\to$ selection $\to$ three training recipes}
+
+    \begin{block}{Scoring --- a single, compute-matched \emph{hard-label} run at seed 0 [B8]}
+    \tiny
+    Every trajectory score comes from \emph{one} full-dataset HL run whose length is \emph{compute-matched}
+    to a downstream run on the coreset [HT Sec.5] --- a bigger budget just buys a longer scoring run:
+    \vspace{-0.12cm}
+    $$K \;=\; \frac{300\cdot\mathrm{IPC}\cdot n_{cls}}{N} \;=\; 6\,/\,30\,/\,60\ \text{epochs (IPC 10/50/100)},
+    \qquad \text{StepLR}@\,\mathrm{round}(K\cdot 151/300).$$
+    \vspace{-0.4cm}
+    \begin{itemize}\setlength\itemsep{1pt}
+        \item \textbf{One instrumented pass logs, per epoch:} the EL2N score
+              $S_k=\lVert\mathrm{softmax}-\mathrm{onehot}\rVert_2\in\mathbb{R}^{K\times N}$, the fp16 softmax
+              trajectories $P\in\mathbb{R}^{K\times N\times C}$, and the frozen teacher soft labels $q$.
+        \item \textbf{CAD} [HT Eq.1--2]: sliding-window uncertainty $U_k=\mathrm{std}\big(S_{k..k+J-1}\big)$;
+              $\mathrm{CAD}=\mathrm{mean}$ of the last $W{=}2$ windows, with $J=K{-}W$ so the windows span the
+              entire run.
+        \item \textbf{Selection is a pure function of this run:} CAD-Prune, SHARP, R-CAD read $S,P,q$ directly;
+              EL2N-Best instead uses a \emph{separate} 10-seed epoch-20 EL2N mean [B3]. The chosen subset is
+              fixed \emph{once per IPC} and reused, unchanged, across all three columns ([HT] convention).
+    \end{itemize}
+    \end{block}
+
+    \vspace{-0.1cm}
+    \begin{block}{The three training recipes (column groups) --- reproduced verbatim by the code}
+    \tiny
+    \begin{itemize}\setlength\itemsep{1pt}
+        \item \textbf{HL} --- one-hot cross-entropy [HT Tab.4]: SGD $10^{-2}$, momentum 0.9, wd $5{\times}10^{-4}$,
+              batch 256, MultiStepLR@151 ($\gamma{=}0.1$), 300 epochs, DSA.
+        \item \textbf{SL} --- \emph{fixed} per-image teacher soft label $q=\mathrm{softmax}(\mathrm{obs}(x)/T)$,
+              KL at $T{=}20$: AdamW $10^{-3}$, cosine, 300 epochs, batch 256, DSA.
+        \item \textbf{KD+SL} --- RDED's official validation code, run \emph{unmodified} [B1]: on-the-fly teacher
+              soft labels on cutmix batches, KL $T{=}20$, AdamW quarter-cosine, 300 epochs, RDED's official
+              batch/lr (incl.\ the hidden \texttt{cifar100-conv3} override bs 25, lr $2{\times}10^{-3}$).
+    \end{itemize}
+    \end{block}
+
+\end{frame}
+
+% ------------------------------------------------------------
+% Our methods: R-CAD and SHARP (SETUP.md Sec.7)
+% ------------------------------------------------------------
+\begin{frame}{Our methods: R-CAD \& SHARP --- one coverage selector, two demand weights}
+
+    \begin{block}{The shared engine --- demand-weighted coverage of each class}
+    \tiny
+    Per class $c$, over the full candidate pool $P_c$ (500 images), build a cosine kernel on
+    L2-normalized observer penultimate features, $\kappa(i,j)=\max\!\big(0,\cos(\hat\varphi_i,\hat\varphi_j)\big)$,
+    and pick the budget-$b$ subset by \textbf{weighted facility location}:
+    \vspace{-0.15cm}
+    $$A_c^{*} \;=\; \arg\max_{A\subset P_c,\ |A|=b}\ \sum_{i\in P_c} w_i\cdot\max_{j\in A}\kappa(i,j)$$
+    \vspace{-0.4cm}
+
+    Monotone submodular $\Rightarrow$ greedy carries the $(1-1/e)$ guarantee (Nemhauser et al., 1978) ---
+    effectively exact and instant at $|P_c|=500$. \textbf{Reading:} every pool image demands to be
+    \emph{represented} by a similar selected exemplar; $w_i$ sets how loudly image $i$ demands it.
+    \end{block}
+
+    \vspace{-0.1cm}
+    \begin{columns}[t]
+        \begin{column}{0.5\textwidth}
+            \begin{block}{R-CAD --- difficulty demand: $w_i=\mathrm{CAD}_i$}
+            \tiny
+            \begin{itemize}\setlength\itemsep{1pt}
+                \item CAD-Prune ranks each image \emph{in a vacuum}; under a tiny budget it spends picks on
+                      near-duplicates of the same difficult mode.
+                \item R-CAD makes the decision \emph{set-level}: keep images that are individually
+                      informative (high CAD) \emph{and} jointly non-redundant.
+                \item Two poles: drop coverage $\to$ CAD-Prune; set $\mathrm{CAD}_i\equiv 1$ $\to$
+                      K-centers. R-CAD is the difficulty-weighted interior.
+            \end{itemize}
+            \end{block}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \begin{block}{SHARP --- alignment demand: $w_i = z_c(A_{\text{grad}})_i$ (shifted $\geq 0$)}
+            \tiny
+            \begin{itemize}\setlength\itemsep{1pt}
+                \item {[HT Sec.3]}: soft labels \emph{homogenize} sample influence; hard labels stay
+                      quality-sensitive $\Rightarrow$ keep images whose hard label \emph{already behaves
+                      like soft-label training}.
+                \item Statically the signal collapses: $(p-y)-(p-q)=q-y$ = teacher confidence (RDED's own
+                      criterion). Along the trajectory, last-layer gradients factor through the features, so
+                      $\cos(\nabla\ell_{HL},\nabla\ell_{SL})\big|_{\theta_k}=\cos(p_k-y,\ p_k-q)$.
+                \item $A_{\text{grad}}(i)=\tfrac{1}{K}\sum_{k}\cos\big(p_k(i)-y_i,\ p_k(i)-q_i\big)$ over
+                      the $K$ scoring epochs (identity verified incl.\ bias, \texttt{sharp.py} selftest 1).
+            \end{itemize}
+            \end{block}
+        \end{column}
+    \end{columns}
+
+    \vspace{0.05cm}
+    {\tiny \textbf{One line:} same coverage selector, different demand --- they disagree only on which
+    images most deserve to be covered. The \textbf{-2D} variants run the identical selection at RDED's pool
+    budget (mipc 300), then RDED's stock crop/select/stitch. Both reuse the cached seed-0 scoring run ---
+    no extra training; the comparison with CAD-Prune is compute-exact.}
+
+\end{frame}
+
+\end{document}
