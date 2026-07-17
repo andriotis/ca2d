@@ -8,10 +8,11 @@ All commands run from `ca2d/`. `<LAPTOP>` = this machine.
 
 ## 1. Server setup (once per server)
 
-1. Clone the repo and create the env exactly as in `SETUP.md` (bench.py imports
+1. Clone the repo and create the env: `conda env create -f environment.yml`
+   (see `SETUP.md` §9; exact pins = determinism). bench.py imports
    `ca2d.py`/`xarch.py`/`rcad.py`/`tin.py`, and KD cells run the official RDED
    repo, expected as a **sibling** directory `../RDED` — it is *not* just one
-   file). PyYAML is required for `launch`.
+   file.
 2. Prewarm the deterministic caches from the laptop (this is what makes remote
    selection/synthesis a no-op — without it every server re-derives scores,
    selection sets and RDED/CA2D synthesis on GPU, and concurrent jobs could

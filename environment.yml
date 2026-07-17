@@ -1,0 +1,23 @@
+# Curated environment for the ca2d benchmark (bench.py + the RDED worker).
+#   conda env create -f environment.yml && conda activate rded
+# Pins are exact: the determinism claims in SETUP.md §8 (and byte-identical
+# cached results) hold under this numeric stack — torch 2.1.0+cu121,
+# cuDNN 8.9.02. Different torch/cuDNN builds reproduce protocols but can
+# drift accuracies by ~0.02–0.03pp.
+# environment.lock.yml is the full `conda env export` of the authors' env.
+name: rded
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10.20
+  - pip
+  - tectonic=0.16.9  # LaTeX engine, only needed to compile `bench.py tex` output
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu121
+      - torch==2.1.0+cu121
+      - torchvision==0.16.0+cu121
+      - numpy==1.26.4
+      - scipy==1.15.3
+      - pillow==12.2.0
+      - tqdm==4.68.1
+      - pyyaml==6.0.3

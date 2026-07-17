@@ -274,3 +274,23 @@ fed to the same feat-kernel facility location as R-CAD.
   same scoring run, so it too adds no training.
 - All sets and results are **path-keyed by the full config**; baseline caches are
   never touched.
+
+---
+
+## 9. Environment
+
+The benchmark runs in the `rded` conda environment:
+
+```bash
+conda env create -f environment.yml
+conda activate rded
+```
+
+`environment.yml` pins the exact numeric stack (Python 3.10.20,
+torch 2.1.0+cu121, cuDNN 8.9.02, numpy 1.26.4, scipy 1.15.3) — the determinism
+guarantees of §8 and byte-identical reuse of cached results hold under these
+versions. Other torch/cuDNN builds reproduce the protocols but drift
+accuracies by ~0.02–0.03pp. `environment.lock.yml` is the authors' full
+`conda env export` (superset with incidental tooling) for exact cloning.
+The official RDED repository is expected as a sibling directory `../RDED`
+(run in a subprocess, unmodified).
