@@ -21,3 +21,4 @@ dependencies:
       - pillow==12.2.0
       - tqdm==4.68.1
       - pyyaml==6.0.3
+      - gdown==6.1.0  # `bench.py prepare` fetches the released RDED teachers

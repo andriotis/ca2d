@@ -8,18 +8,20 @@ All commands run from `ca2d/`. `<LAPTOP>` = this machine.
 
 ## 1. Server setup (once per server)
 
-1. Clone the repo and create the env: `conda env create -f environment.yml`
-   (see `SETUP.md` §9; exact pins = determinism). bench.py imports
-   `ca2d.py`/`xarch.py`/`rcad.py`/`tin.py`, and KD cells run the official RDED
-   repo, expected as a **sibling** directory `../RDED` — it is *not* just one
-   file.
+1. Clone the repo (bench.py imports `ca2d.py`/`xarch.py`/`rcad.py`/`tin.py`,
+   and KD cells run the official RDED repo, expected as a **sibling** directory
+   `../RDED` — it is *not* just one file), create the env, and bootstrap:
+
+   ```bash
+   conda env create -f environment.yml && conda activate rded
+   python bench.py prepare        # downloads datasets + teachers, builds trees
+   ```
 2. Prewarm the deterministic caches from the laptop (this is what makes remote
    selection/synthesis a no-op — without it every server re-derives scores,
    selection sets and RDED/CA2D synthesis on GPU, and concurrent jobs could
    race building shared sets):
 
    ```bash
-   rsync -av <LAPTOP>:nikos/ca2d/artifacts/pretrain_models/ artifacts/pretrain_models/
    rsync -av <LAPTOP>:nikos/ca2d/artifacts/scores/          artifacts/scores/
    rsync -av <LAPTOP>:nikos/ca2d/artifacts/sets/            artifacts/sets/
    rsync -av <LAPTOP>:nikos/ca2d/artifacts/rded_sets/       artifacts/rded_sets/   # optional (cheap to rebuild)
@@ -28,9 +30,7 @@ All commands run from `ca2d/`. `<LAPTOP>` = this machine.
    rsync -av --include='bench_*_el2nsearch_*.json' --exclude='*' \
        <LAPTOP>:nikos/ca2d/artifacts/results/ artifacts/results/
    ```
-3. Datasets + RDED data trees: download CIFAR-100 / TinyImageNet per `SETUP.md`,
-   then `python bench.py prepare`.
-4. Sanity: `python bench.py selftest`.
+3. Sanity: `python bench.py selftest`.
 
 ## 2. Write the manifest and launch
 

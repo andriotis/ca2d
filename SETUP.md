@@ -294,3 +294,15 @@ accuracies by ~0.02–0.03pp. `environment.lock.yml` is the authors' full
 `conda env export` (superset with incidental tooling) for exact cloning.
 The official RDED repository is expected as a sibling directory `../RDED`
 (run in a subprocess, unmodified).
+
+A fresh clone bootstraps with one command:
+
+```bash
+python bench.py prepare
+```
+
+which downloads everything the benchmark needs — CIFAR-100 (torchvision),
+tiny-imagenet-200 (cs231n), and the 4 released RDED teacher checkpoints
+(cifar100/tinyimagenet × conv/resnet18_modified, ~183MB, from the Drive
+folder linked in `RDED/README.md`) — then builds the RDED-layout data trees.
+Idempotent: anything already present is skipped.

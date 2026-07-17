@@ -66,7 +66,7 @@ per-cell seed lists (see RUNBOOK-seeds.md).
 
 Usage:
     python bench.py selftest
-    python bench.py prepare                       # RDED-layout data trees + symlinks
+    python bench.py prepare   # downloads datasets + teachers, builds data trees
     python bench.py score  --ds tin --arch rn18 --ipc 100
     python bench.py el2n   --ds cifar100 --arch conv
     python bench.py select --ds cifar100 --arch conv --method rcad --ipc 100
@@ -90,6 +90,8 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
+import zipfile
 
 import numpy as np
 import torch
@@ -1069,6 +1071,70 @@ def eval_el2nbest(ds, arch, regime, ipc, seeds, device, devices=None):
 
 
 # --------------------------------------------------------------------------- #
+# prepare — downloads (datasets + released teachers), then RDED-layout trees
+# --------------------------------------------------------------------------- #
+TIN_ZIP_URL = "https://cs231n.stanford.edu/tiny-imagenet-200.zip"
+# Released RDED teacher checkpoints (RDED/README.md "pre-trained observer
+# models" Drive folder; same source as teachers.py `models`).
+RDED_MODELS_URL = ("https://drive.google.com/drive/folders/"
+                   "1HmrheO6MgX453a5UPJdxPHK4UTv-4aVt")
+
+
+def _download(url, dest):
+    bar = tqdm(desc=os.path.basename(dest), unit="B", unit_scale=True,
+               dynamic_ncols=True, leave=False)
+
+    def hook(blocks, bsz, total):
+        if total > 0:
+            bar.total = total
+        bar.update(blocks * bsz - bar.n)
+
+    urllib.request.urlretrieve(url, dest, reporthook=hook)
+    bar.close()
+
+
+def ensure_teachers():
+    """Fetch the 4 released teacher .pth files this benchmark uses."""
+    mdir = os.path.join(ART, "pretrain_models")
+    os.makedirs(mdir, exist_ok=True)
+    need = sorted({f"{BDS[ds]['subset']}_{rded_arch(ds, a)}.pth"
+                   for ds in BDS for a in ("conv", "rn18")})
+    missing = [n for n in need if not os.path.exists(os.path.join(mdir, n))]
+    if not missing:
+        print(f"[prepare] teachers already present ({len(need)})")
+        return
+    import gdown
+    print(f"[prepare] fetching {len(missing)} teacher ckpt(s): {missing}")
+    files = gdown.download_folder(RDED_MODELS_URL, skip_download=True,
+                                  quiet=True, use_cookies=False)
+    ids = {os.path.basename(f.path): f.id for f in files}
+    for fn in missing:
+        assert fn in ids, f"{fn} not in the RDED Drive folder"
+        gdown.download(id=ids[fn], output=os.path.join(mdir, fn) + ".part",
+                       quiet=False)
+        os.replace(os.path.join(mdir, fn) + ".part", os.path.join(mdir, fn))
+        print(f"[prepare] {fn} -> {mdir}")
+
+
+def ensure_tin_raw():
+    """Download + extract the raw tiny-imagenet-200 tree if missing.
+    (CIFAR-100 needs nothing: ca2d.load_cifar100 downloads via torchvision.)"""
+    if os.path.isdir(tin.TIN_DIR):
+        print(f"[prepare] {tin.TIN_DIR} already present")
+        return
+    os.makedirs(ca2d.DATA_DIR, exist_ok=True)
+    zpath = tin.TIN_DIR + ".zip"
+    print(f"[prepare] downloading tiny-imagenet-200 (~237MB)")
+    _download(TIN_ZIP_URL, zpath)
+    print("[prepare] extracting...")
+    with zipfile.ZipFile(zpath) as z:
+        z.extractall(ca2d.DATA_DIR)
+    os.remove(zpath)
+    assert os.path.isdir(tin.TIN_DIR), tin.TIN_DIR
+    print(f"[prepare] extracted {tin.TIN_DIR}")
+
+
+# --------------------------------------------------------------------------- #
 # prepare — RDED-layout data trees under artifacts/rded
 # (5-digit ImageFolder layout per RDED/prepare/*.md; CIFAR as lossless PNG —
 #  teachers.py:227 measured 1.6-3.1pp teacher-top-1 loss under JPEG — and
@@ -1133,8 +1199,12 @@ def _prep_tin_tree(data):
 
 
 def cmd_prepare():
+    assert os.path.isdir(RDED_ROOT), \
+        f"{RDED_ROOT} missing — the official RDED repo must sit next to ca2d/"
     for p in (RDED_CWD, EXPORT_DIR, LOG_DIR, SCORE_DIR, SET_DIR, RESULT_DIR):
         os.makedirs(p, exist_ok=True)
+    ensure_teachers()
+    ensure_tin_raw()
     data = os.path.join(RDED_CWD, "data")
     os.makedirs(data, exist_ok=True)
     link = os.path.join(data, "pretrain_models")
