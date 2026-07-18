@@ -1,0 +1,16 @@
+# deepstream1 (ds1, 2x3080): both conv tables, seed 45.
+# Note the built-in imbalance: from the persisted seed timings, one seed of
+# conv-tin is ~30h (3090-scale, likely ~1.3x on a 3080) vs ~5.5h for all of
+# conv-cifar100 — cuda:1 frees early while cuda:0 carries the TIN table.
+# Jobs may not share a GPU, so evening this out needs chained manifests:
+# use deepstream1-phase{1,2}.yaml instead of this file for balanced GPUs.
+# This single file is the simple alternative (use one OR the other).
+jobs:
+  - name: tin-conv-s45
+    table: conv-tin
+    seeds: [45]
+    devices: [cuda:0]
+  - name: cifar-conv-s45
+    table: conv-cifar100
+    seeds: [45]
+    devices: [cuda:1]

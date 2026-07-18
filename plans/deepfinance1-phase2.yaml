@@ -1,0 +1,19 @@
+# df1 phase 2/2: rn18-cifar100, seeds 45+46, split by regime (est 3090-h for
+# 2 seeds: kd ~17, hl ~17, sl ~12). Same CA2D_RESULT_DIR staging setup as
+# phase 1 (see deepfinance1-phase1.yaml).
+jobs:
+  - name: cifarrn18-s4546-kd
+    table: rn18-cifar100
+    seeds: [45, 46]
+    regimes: [kd]
+    devices: [cuda:1]
+  - name: cifarrn18-s4546-hl
+    table: rn18-cifar100
+    seeds: [45, 46]
+    regimes: [hl]
+    devices: [cuda:2]
+  - name: cifarrn18-s4546-sl
+    table: rn18-cifar100
+    seeds: [45, 46]
+    regimes: [sl]
+    devices: [cuda:0]

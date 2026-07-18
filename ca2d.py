@@ -64,7 +64,10 @@ ART = os.path.join(ROOT, "artifacts")
 DATA_DIR = os.path.join(ART, "data")
 SCORE_DIR = os.path.join(ART, "scores")
 SET_DIR = os.path.join(ART, "sets")
-RESULT_DIR = os.path.join(ART, "results")
+# CA2D_RESULT_DIR redirects result JSONs (e.g. a staging dir for new-seed runs
+# on a machine whose artifacts/results already holds finished cells); scores/
+# sets stay shared — they are deterministic caches, not results.
+RESULT_DIR = os.environ.get("CA2D_RESULT_DIR", os.path.join(ART, "results"))
 OBSERVER_CKPT_NAME = "cifar100_conv3.pth"
 
 NUM_CLASSES = 100

@@ -1,0 +1,13 @@
+# deepstream2 (ds2, 2x3080): both conv tables, seed 46.
+# Mirror of deepstream1.yaml (same cells, different seed) — merge unions the
+# two seeds per cell on the laptop. Prefer deepstream2-phase{1,2}.yaml for
+# balanced GPUs (use one OR the other, not both).
+jobs:
+  - name: tin-conv-s46
+    table: conv-tin
+    seeds: [46]
+    devices: [cuda:0]
+  - name: cifar-conv-s46
+    table: conv-cifar100
+    seeds: [46]
+    devices: [cuda:1]

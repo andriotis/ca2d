@@ -1,0 +1,24 @@
+# ds1 phase 1/2: conv-tin, seed 45, split by IPC across both GPUs.
+# From persisted timings (3090-scale, missing blocks extrapolated):
+#   ipc100 ~24h  vs  ipc10+50 ~18h  — the tightest 2-way product split.
+# Run chained:
+#   python bench.py launch plans/deepstream1-phase1.yaml && \
+#   python bench.py launch plans/deepstream1-phase2.yaml
+# NOTE: tin-conv el2nbest sl/kd ipc100 have no cached el2nsearch yet; unless
+# df1 runs those two cells (seeds 42-44) first and the runbook el2nsearch
+# rsync ships them, the ipc100 job here pays the two 10-window searches
+# itself (~15-18h extra) — and ds2 would duplicate the exact same searches.
+# 3080 (10GB) MEMORY: prewarming artifacts/scores+sets is REQUIRED for tin —
+# full-dataset scoring OOMs a 3080; set-sized cells peak ~4.1GB and are fine.
+# Run the df1 prebuild block in RUNBOOK-seeds.md step 2 first.
+jobs:
+  - name: tin-s45-ipc100
+    table: conv-tin
+    seeds: [45]
+    ipcs: [100]
+    devices: [cuda:0]
+  - name: tin-s45-ipc10-50
+    table: conv-tin
+    seeds: [45]
+    ipcs: [10, 50]
+    devices: [cuda:1]

@@ -1500,6 +1500,19 @@ def _pump(job, proc, log_path, done_re):
             log.write(buf + b"\n")
 
 
+def score_cached(ds, arch, ipc):
+    """Mirror score_blob's cache checks without loading or computing."""
+    if os.path.exists(os.path.join(SCORE_DIR, f"bench_{ds}_{arch}_ipc{ipc}.pt")):
+        return True
+    if arch == "conv" and ipc in (10, 50):
+        if ds == "tin":
+            return os.path.exists(
+                os.path.join(SCORE_DIR, f"tin_score_ipc{ipc}.pt"))
+        return (os.path.exists(os.path.join(SCORE_DIR, f"cad_ipc{ipc}.pt")) and
+                os.path.exists(os.path.join(SCORE_DIR, f"probe_ipc{ipc}.pt")))
+    return False
+
+
 def cmd_launch(plan_path, dry_run=False):
     """Run a YAML manifest of jobs, one `bench.py run` subprocess per job.
     Refuses to start unless jobs are pairwise disjoint in cells and devices."""
@@ -1579,6 +1592,19 @@ def cmd_launch(plan_path, dry_run=False):
         sys.exit(1)
     for j in jobs:
         ds, arch = TABLES[j["table"]]
+        blob_methods = [m for m in j["methods"]
+                        if m not in ("random", "rded", "el2nbest", "full")]
+        gpu_heavy = [f"scoring run ipc{i}" for i in j["ipcs"]
+                     if blob_methods and not score_cached(ds, arch, i)]
+        if "el2nbest" in j["methods"] and any(
+                not os.path.exists(el2n_run_path(ds, arch, r))
+                for r in EL2N_SEEDS):
+            gpu_heavy.append("[B3] EL2N runs")
+        if gpu_heavy:
+            print(f"[launch] WARNING: {j['name']} must compute "
+                  f"{', '.join(gpu_heavy)} ({ds}/{arch}) on-GPU: full-dataset "
+                  f"training holds the whole train set in VRAM — tin needs "
+                  f">10GB (OOMs a 3080). Prewarm artifacts/scores/ instead.")
         cells = [(m, r, i) for i in j["ipcs"] for r in j["regimes"]
                  for m in j["methods"]]
         j["total"] = len(cells)

@@ -1,0 +1,13 @@
+# ds1 phase 2/2: conv-cifar100, seed 45, split by IPC (~2.7h vs ~1.8h).
+# Runs after phase 1 via `&&` (see deepstream1-phase1.yaml).
+jobs:
+  - name: cifar-s45-ipc100
+    table: conv-cifar100
+    seeds: [45]
+    ipcs: [100]
+    devices: [cuda:0]
+  - name: cifar-s45-ipc10-50
+    table: conv-cifar100
+    seeds: [45]
+    ipcs: [10, 50]
+    devices: [cuda:1]

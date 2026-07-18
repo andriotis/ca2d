@@ -1,0 +1,16 @@
+# ds2 phase 1/2: conv-tin, seed 46 — mirror of deepstream1-phase1.yaml
+# (same cells, different seed; see that file for balance + el2nsearch notes).
+# Run chained:
+#   python bench.py launch plans/deepstream2-phase1.yaml && \
+#   python bench.py launch plans/deepstream2-phase2.yaml
+jobs:
+  - name: tin-s46-ipc100
+    table: conv-tin
+    seeds: [46]
+    ipcs: [100]
+    devices: [cuda:0]
+  - name: tin-s46-ipc10-50
+    table: conv-tin
+    seeds: [46]
+    ipcs: [10, 50]
+    devices: [cuda:1]

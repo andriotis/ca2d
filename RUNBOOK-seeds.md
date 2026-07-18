@@ -16,10 +16,13 @@ All commands run from `ca2d/`. `<LAPTOP>` = this machine.
    conda env create -f environment.yml && conda activate rded
    python bench.py prepare        # downloads datasets + teachers, builds trees
    ```
-2. Prewarm the deterministic caches from the laptop (this is what makes remote
-   selection/synthesis a no-op — without it every server re-derives scores,
-   selection sets and RDED/CA2D synthesis on GPU, and concurrent jobs could
-   race building shared sets):
+2. Prewarm the deterministic caches from the laptop. For CIFAR this is an
+   optimization; **for TIN on ≤10GB GPUs (3080) it is required**: the
+   full-dataset scoring/EL2N runs hold the whole 100k-image train set in VRAM
+   (~4.9GB + activations, OOMs a 3080), while set-sized cells peak at ~4.1GB
+   and are safe. `launch` warns if a manifest would trigger uncached scoring.
+   Prewarming also stops servers duplicating selection/synthesis and racing
+   on shared sets:
 
    ```bash
    rsync -av <LAPTOP>:nikos/ca2d/artifacts/scores/          artifacts/scores/
@@ -30,7 +33,61 @@ All commands run from `ca2d/`. `<LAPTOP>` = this machine.
    rsync -av --include='bench_*_el2nsearch_*.json' --exclude='*' \
        <LAPTOP>:nikos/ca2d/artifacts/results/ artifacts/results/
    ```
+   **df1 prebuild (run once on df1, before any launches).** Builds every
+   still-missing deterministic artifact on the 24GB GPUs, so the ds boxes
+   never score (3080-unsafe) and concurrent regime-split jobs never race on
+   shared set builds. The el2nbest cells also produce needed 42–44 baselines:
+
+   ```bash
+   # missing scoring blob (full-dataset run — 24GB GPU only)
+   python bench.py score --ds tin --arch rn18 --ipc 100 --device cuda:1
+   # missing selection/synthesis sets
+   for m in cadprune sharp rcad sharp2d rcad2d; do
+     python bench.py select --ds tin      --arch conv --method $m --ipc 100 --device cuda:1
+     python bench.py select --ds cifar100 --arch rn18 --method $m --ipc 100 --device cuda:1
+     python bench.py select --ds tin      --arch rn18 --method $m --ipc 100 --device cuda:1
+   done
+   for m in cadprune sharp rcad; do
+     python bench.py select --ds tin --arch rn18 --method $m --ipc 50 --device cuda:1
+   done
+   for m in rded ca2d; do
+     python bench.py select --ds tin --arch rn18 --method $m --ipc 100 --device cuda:1
+   done
+   # missing el2nbest window searches for the ds workloads (also 42-44 cells)
+   python bench.py cell --ds tin --arch conv --method el2nbest --regime sl --ipc 100 \
+       --seeds 42,43,44 --devices cuda:0,cuda:1,cuda:2
+   python bench.py cell --ds tin --arch conv --method el2nbest --regime kd --ipc 100 \
+       --seeds 42,43,44 --devices cuda:0,cuda:1,cuda:2
+   ```
+
+   then re-run the step-2 rsyncs so `sets/` and the el2nsearch files reach the
+   servers.
 3. Sanity: `python bench.py selftest`.
+
+## 2b. df1 runs its own share (rn18 tables) — staging results
+
+df1 is the live checkout: running new seeds directly would **overwrite** the
+existing seed-42–44 cell JSONs (a `--seeds 45,46` run is a cache miss that
+rewrites the same filename). `CA2D_RESULT_DIR` redirects result writes to a
+staging dir; scores/sets stay shared (they are caches, not results):
+
+```bash
+cd ~/nikos/ca2d
+export CA2D_RESULT_DIR=$PWD/artifacts/results_s4546
+mkdir -p $CA2D_RESULT_DIR
+cp artifacts/results/bench_*_el2nsearch_*.json $CA2D_RESULT_DIR/  # reuse seed-42 searches
+tmux new -s bench 'export CA2D_RESULT_DIR=$PWD/artifacts/results_s4546; \
+  python bench.py launch plans/deepfinance1-phase1.yaml && \
+  python bench.py launch plans/deepfinance1-phase2.yaml'
+```
+
+At merge time the staging dir is just another input dir (run with the env
+var **unset** so merges land in the real results):
+
+```bash
+unset CA2D_RESULT_DIR
+python bench.py merge artifacts/results_s4546 ~/incoming/*/ --dry-run
+```
 
 ## 2. Write the manifest and launch
 
@@ -52,22 +109,23 @@ tmux new -s bench 'python bench.py launch plans/serverX.yaml'
   reruns all its seeds (accepted cost; result JSONs are written atomically, so
   an interrupt can never corrupt them).
 
-## 3. Collect results on the laptop
+## 3. Collect results on df1
 
-Copy each server's results into its **own staging dir** — never directly into
-the repo's `artifacts/results/`:
+Copy each ds server's results into its **own staging dir** — never directly
+into the repo's `artifacts/results/`:
 
 ```bash
-rsync -av serverA:.../ca2d/artifacts/results/ ~/incoming/serverA/
-rsync -av serverB:.../ca2d/artifacts/results/ ~/incoming/serverB/
-# ... one dir per server
+rsync -av dvspanos@deepstream1.csd.auth.gr:nikos/ca2d/artifacts/results/ ~/incoming/ds1/
+rsync -av dvspanos@deepstream2.csd.auth.gr:nikos/ca2d/artifacts/results/ ~/incoming/ds2/
 ```
 
-## 4. Merge (laptop)
+## 4. Merge (df1, with CA2D_RESULT_DIR unset)
+
+The df1 staging dir from §2b is just another merge input:
 
 ```bash
-python bench.py merge ~/incoming/*/ --dry-run   # preview: seeds [42,43,44] -> [42..46] per cell
-python bench.py merge ~/incoming/*/
+python bench.py merge artifacts/results_s4546 ~/incoming/*/ --dry-run
+python bench.py merge artifacts/results_s4546 ~/incoming/*/
 ```
 
 Any number of dirs; order-independent; safe to rerun (already-merged cells
