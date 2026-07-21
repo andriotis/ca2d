@@ -1,0 +1,6 @@
+jobs:
+  - name: tin-s46-ipc10-50-100
+    table: conv-tin
+    seeds: [46]
+    ipcs: [10, 50, 100]
+    devices: [cuda:0]
