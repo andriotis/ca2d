@@ -1,8 +1,10 @@
 # Runbook: extending the tables to seeds 42–46 on multiple servers
 
 Goal: add seeds **45, 46** to every cell of the four tables. Existing 3-seed
-results (canonical and legacy JSONs) are **kept and never re-run** — servers
-compute only the new seeds, and `merge` unions them on the laptop.
+results (canonical and legacy JSONs) are **kept and never re-run**: a run
+computes only the seeds missing from a cell's JSON and seed-unions them in
+(so running on the live checkout is safe — no staging dir), and `merge`
+unions the other servers' dirs on the laptop.
 
 All commands run from `ca2d/`. `<LAPTOP>` = this machine.
 
@@ -21,8 +23,9 @@ All commands run from `ca2d/`. `<LAPTOP>` = this machine.
    full-dataset scoring/EL2N runs hold the whole 100k-image train set in VRAM
    (~4.9GB + activations, OOMs a 3080), while set-sized cells peak at ~4.1GB
    and are safe. `launch` warns if a manifest would trigger uncached scoring.
-   Prewarming also stops servers duplicating selection/synthesis and racing
-   on shared sets:
+   Prewarming also stops servers duplicating selection/synthesis (concurrent
+   jobs on one server never race — shared builds are lock-serialized — but
+   each *server* would still redo the same deterministic work):
 
    ```bash
    rsync -av <LAPTOP>:nikos/ca2d/artifacts/scores/          artifacts/scores/
@@ -33,10 +36,11 @@ All commands run from `ca2d/`. `<LAPTOP>` = this machine.
    rsync -av --include='bench_*_el2nsearch_*.json' --exclude='*' \
        <LAPTOP>:nikos/ca2d/artifacts/results/ artifacts/results/
    ```
-   **df1 prebuild (run once on df1, before any launches).** Builds every
-   still-missing deterministic artifact on the 24GB GPUs, so the ds boxes
-   never score (3080-unsafe) and concurrent regime-split jobs never race on
-   shared set builds. The el2nbest cells also produce needed 42–44 baselines:
+   **df1 prebuild (optional, run once on df1 before any launches).** Builds
+   every still-missing deterministic artifact on the 24GB GPUs, so the ds
+   boxes never score (3080-unsafe) and the other df1 GPUs never idle waiting
+   on a lock-serialized shared build. The el2nbest cells also produce needed
+   42–44 baselines:
 
    ```bash
    # missing scoring blob (full-dataset run — 24GB GPU only)
@@ -64,29 +68,16 @@ All commands run from `ca2d/`. `<LAPTOP>` = this machine.
    servers.
 3. Sanity: `python bench.py selftest`.
 
-## 2b. df1 runs its own share (rn18 tables) — staging results
+## 2b. df1 runs its own share (rn18 tables)
 
-df1 is the live checkout: running new seeds directly would **overwrite** the
-existing seed-42–44 cell JSONs (a `--seeds 45,46` run is a cache miss that
-rewrites the same filename). `CA2D_RESULT_DIR` redirects result writes to a
-staging dir; scores/sets stay shared (they are caches, not results):
+df1 is the live checkout, and that is fine: a `--seeds 45,46` run computes
+only the missing seeds and **seed-unions** them into the existing cell JSONs
+(never rewrites them), so no staging dir or `CA2D_RESULT_DIR` is needed:
 
 ```bash
 cd ~/nikos/ca2d
-export CA2D_RESULT_DIR=$PWD/artifacts/results_s4546
-mkdir -p $CA2D_RESULT_DIR
-cp artifacts/results/bench_*_el2nsearch_*.json $CA2D_RESULT_DIR/  # reuse seed-42 searches
-tmux new -s bench 'export CA2D_RESULT_DIR=$PWD/artifacts/results_s4546; \
-  python bench.py launch plans/deepfinance1-phase1.yaml && \
+tmux new -s bench 'python bench.py launch plans/deepfinance1-phase1.yaml && \
   python bench.py launch plans/deepfinance1-phase2.yaml'
-```
-
-At merge time the staging dir is just another input dir (run with the env
-var **unset** so merges land in the real results):
-
-```bash
-unset CA2D_RESULT_DIR
-python bench.py merge artifacts/results_s4546 ~/incoming/*/ --dry-run
 ```
 
 ## 2. Write the manifest and launch
@@ -105,9 +96,10 @@ tmux new -s bench 'python bench.py launch plans/serverX.yaml'
 - Per-job output goes to `artifacts/logs/launch_<name>.log`; the terminal shows
   `[name done/total]`-prefixed cell completions.
 - **Crash / Ctrl-C → rerun the same command.** Finished cells are cached and
-  skipped. Resume granularity is the *cell*: a cell interrupted after 4/5 seeds
-  reruns all its seeds (accepted cost; result JSONs are written atomically, so
-  an interrupt can never corrupt them).
+  skipped; a partially-complete cell (JSON has some of the requested seeds)
+  reruns only the missing seeds and unions them in. Seeds in flight when the
+  interrupt hit are not persisted and rerun (result JSONs are written
+  atomically, so an interrupt can never corrupt them).
 
 ## 3. Collect results on df1
 
@@ -119,13 +111,14 @@ rsync -av dvspanos@deepstream1.csd.auth.gr:nikos/ca2d/artifacts/results/ ~/incom
 rsync -av dvspanos@deepstream2.csd.auth.gr:nikos/ca2d/artifacts/results/ ~/incoming/ds2/
 ```
 
-## 4. Merge (df1, with CA2D_RESULT_DIR unset)
+## 4. Merge (df1)
 
-The df1 staging dir from §2b is just another merge input:
+df1's own runs already landed in `artifacts/results/`; merge folds in the
+other servers:
 
 ```bash
-python bench.py merge artifacts/results_s4546 ~/incoming/*/ --dry-run
-python bench.py merge artifacts/results_s4546 ~/incoming/*/
+python bench.py merge ~/incoming/*/ --dry-run
+python bench.py merge ~/incoming/*/
 ```
 
 Any number of dirs; order-independent; safe to rerun (already-merged cells
@@ -147,8 +140,9 @@ automatically.
 ## Caveats
 
 - The `--seeds` default is now `42,43,44,45,46`: a local `run`/`cell` before
-  merging treats existing 3-seed files as cache misses and would re-run the
-  cell — merge first, or pass `--seeds 42,43,44` explicitly.
+  merging computes only the seeds missing from the cell JSON (never re-runs
+  existing ones) — harmless, but it duplicates work a server may already be
+  doing; runs are deterministic, so the duplicates dedupe at merge time.
 - `seed_secs` merged from different machines are not comparable wall-times;
   `bench.py timing` averages across hardware.
 - GPU0 on the current lab box is ~3.5× slower under load; the pool tolerates it

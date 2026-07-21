@@ -1,6 +1,6 @@
 # df1 phase 2/2: rn18-cifar100, seeds 45+46, split by regime (est 3090-h for
-# 2 seeds: kd ~17, hl ~17, sl ~12). Same CA2D_RESULT_DIR staging setup as
-# phase 1 (see deepfinance1-phase1.yaml).
+# 2 seeds: kd ~17, hl ~17, sl ~12). Launch as in deepfinance1-phase1.yaml
+# (no staging needed: cell writes seed-union into existing JSONs).
 jobs:
   - name: cifarrn18-s4546-kd
     table: rn18-cifar100

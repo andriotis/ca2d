@@ -3,20 +3,12 @@
 # kd on cuda:1, lightest slice on cuda:0 — GPU0 has run ~3.5x slower under
 # load in the past).
 #
-# df1 RUNS ON THE LIVE CHECKOUT: results MUST go to a staging dir, or the
-# existing seed-42-44 cell JSONs get overwritten. Launch exactly like this
-# (env propagates to all workers):
-#   export CA2D_RESULT_DIR=$PWD/artifacts/results_s4546
-#   mkdir -p $CA2D_RESULT_DIR
-#   cp artifacts/results/bench_*_el2nsearch_*.json $CA2D_RESULT_DIR/
+# Launch (safe on the live checkout: cell writes seed-union into existing
+# JSONs, and shared set/score builds are lock-serialized across jobs):
 #   python bench.py launch plans/deepfinance1-phase1.yaml && \
 #   python bench.py launch plans/deepfinance1-phase2.yaml
-# Prereq: the df1 prebuild block in RUNBOOK-seeds.md (tin-rn18 ipc100 scoring
-# + missing set builds) — otherwise the three regime jobs race on shared,
-# uncached selection artifacts.
-# Afterwards merge the staging dir like any server dir:
-#   unset CA2D_RESULT_DIR
-#   python bench.py merge artifacts/results_s4546 ~/incoming/*/
+# Optional: the df1 prebuild block in RUNBOOK-seeds.md avoids the other two
+# GPUs idling while the first job builds tin-rn18 ipc100 scoring + sets.
 jobs:
   - name: tinrn18-s4546-kd
     table: rn18-tin

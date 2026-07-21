@@ -82,6 +82,8 @@ Usage:
 
 import argparse
 import concurrent.futures
+import contextlib
+import fcntl
 import json
 import os
 import queue
@@ -116,7 +118,19 @@ RDED_ROOT = os.path.join(os.path.dirname(ROOT), "RDED")
 RDED_CWD = os.path.join(ART, "rded")          # worker cwd (./data/... resolves here)
 EXPORT_DIR = os.path.join(ART, "rded_sets")   # PNG ImageFolder exports of coresets
 LOG_DIR = os.path.join(ART, "logs")
+LOCK_DIR = os.path.join(ART, "locks")
 TEX_DIR = os.path.join(ROOT, "tex")
+
+
+@contextlib.contextmanager
+def artifact_lock(name):
+    """Serialize builds/writes of a shared artifact across concurrent launch
+    jobs: the first process builds while the rest block, then re-check the
+    cache and reuse. Lock files are advisory (flock) and never cleaned up."""
+    os.makedirs(LOCK_DIR, exist_ok=True)
+    with open(os.path.join(LOCK_DIR, f"{name}.lock"), "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        yield
 
 BDS = {
     "cifar100": dict(nclass=100, size=32, ntrain=50000, pool=500, subset="cifar100",
@@ -280,7 +294,10 @@ def score_blob(ds, arch, ipc, device):
             probe = torch.load(probe_p, map_location="cpu")
             blob["P"], blob["q"] = probe["P"], probe["q"]
             return blob
-    return run_score(ds, arch, ipc, device, path)
+    with artifact_lock(os.path.basename(path)):
+        if os.path.exists(path):  # built by a concurrent job while we waited
+            return torch.load(path, map_location="cpu")
+        return run_score(ds, arch, ipc, device, path)
 
 
 def run_score(ds, arch, ipc, device, out_path):
@@ -318,7 +335,8 @@ def run_score(ds, arch, ipc, device, out_path):
     blob = {"S": S, "U": U, "cad": cad, "P": P, "q": q, "K": K,
             "step_epoch": step_epoch, "seed": 0, "aug": "dsa",
             "secs": time.time() - t0}
-    torch.save(blob, out_path)
+    torch.save(blob, out_path + ".tmp")  # atomic: no torn blob on interrupt
+    os.replace(out_path + ".tmp", out_path)
     print(f"[score] saved {out_path} ({blob['secs']:.0f}s)")
     return blob
 
@@ -332,35 +350,39 @@ def el2n_run(ds, arch, r, device, epoch_hook=None):
     p = el2n_run_path(ds, arch, r)
     if os.path.exists(p):
         return p
-    os.makedirs(SCORE_DIR, exist_ok=True)
-    d = BDS[ds]
-    t0 = time.time()
-    xtr_u8, ytr = load_train(ds)
-    set_seed(r)
-    x = to_norm_tensor(xtr_u8, d["mean"], d["std"]).contiguous()
-    y = torch.from_numpy(ytr).long()
-    y1h = F.one_hot(y, d["nclass"]).float()
-    model = build_student(ds, arch)
-    out = {}
-    bar = None
-    if epoch_hook is None:
-        bar = tqdm(total=EL2N_EPOCH, desc=f"el2n {ds}/{arch} run{r}", unit="ep",
-                   dynamic_ncols=True, leave=False)
-        epoch_hook = bar_hook(bar)
+    with artifact_lock(os.path.basename(p)):
+        if os.path.exists(p):  # built by a concurrent job while we waited
+            return p
+        os.makedirs(SCORE_DIR, exist_ok=True)
+        d = BDS[ds]
+        t0 = time.time()
+        xtr_u8, ytr = load_train(ds)
+        set_seed(r)
+        x = to_norm_tensor(xtr_u8, d["mean"], d["std"]).contiguous()
+        y = torch.from_numpy(ytr).long()
+        y1h = F.one_hot(y, d["nclass"]).float()
+        model = build_student(ds, arch)
+        out = {}
+        bar = None
+        if epoch_hook is None:
+            bar = tqdm(total=EL2N_EPOCH, desc=f"el2n {ds}/{arch} run{r}",
+                       unit="ep", dynamic_ncols=True, leave=False)
+            epoch_hook = bar_hook(bar)
 
-    def hook(ep, m):
-        epoch_hook(ep, m)
-        if ep == EL2N_EPOCH - 1:
-            out["el2n"] = el2n_scores(m, x, y1h, device)
+        def hook(ep, m):
+            epoch_hook(ep, m)
+            if ep == EL2N_EPOCH - 1:
+                out["el2n"] = el2n_scores(m, x, y1h, device)
 
-    # StepLR@151 never fires inside 20 epochs -> constant early-training lr
-    hl_train(model, x, y, device, epochs=EL2N_EPOCH, step_epoch=151,
-             aug="dsa", epoch_hook=hook)
-    if bar is not None:
-        bar.close()
-    torch.save({"el2n": out["el2n"], "seed": r, "epoch": EL2N_EPOCH,
-                "secs": time.time() - t0}, p)
-    print(f"[el2n] saved {p} ({time.time() - t0:.0f}s)", flush=True)
+        # StepLR@151 never fires inside 20 epochs -> constant early-training lr
+        hl_train(model, x, y, device, epochs=EL2N_EPOCH, step_epoch=151,
+                 aug="dsa", epoch_hook=hook)
+        if bar is not None:
+            bar.close()
+        torch.save({"el2n": out["el2n"], "seed": r, "epoch": EL2N_EPOCH,
+                    "secs": time.time() - t0}, p + ".tmp")
+        os.replace(p + ".tmp", p)  # atomic: no torn blob on interrupt
+        print(f"[el2n] saved {p} ({time.time() - t0:.0f}s)", flush=True)
     return p
 
 
@@ -434,8 +456,10 @@ def dir_complete(root, nclass, per_class):
 
 
 def save_blob(name, x_u8, y, keep):
+    p = os.path.join(SET_DIR, name + ".pt")
     torch.save({"images": x_u8[keep], "labels": y[keep], "indices": keep},
-               os.path.join(SET_DIR, name + ".pt"))
+               p + ".tmp")  # atomic: no torn blob on interrupt
+    os.replace(p + ".tmp", p)
     print(f"[select] saved {name}.pt")
 
 
@@ -467,12 +491,18 @@ def fl_select(ds, arch, method, blob, xtr_u8, ytr, budget, device, desc):
 
 
 def build_set(ds, arch, method, ipc, device):
-    """Ensure the selection/synthesis artifact exists; return set name (SET_DIR)."""
+    """Ensure the selection/synthesis artifact exists; return set name (SET_DIR).
+    Lock-serialized so concurrent launch jobs never race on a shared build."""
     assert method not in ("full", "el2nbest")
     name = legacy_set(ds, arch, method, ipc)
     if name is not None:
         return name
     name = set_key(ds, arch, method, ipc)
+    with artifact_lock(name):
+        return _build_set_locked(ds, arch, method, ipc, device, name)
+
+
+def _build_set_locked(ds, arch, method, ipc, device, name):
     d = BDS[ds]
     if method == "rded":
         return build_rded_set(ds, arch, ipc, device)
@@ -849,15 +879,83 @@ def legacy_result(ds, arch, method, regime, ipc):
 
 
 def load_result(ds, arch, method, regime, ipc, seeds=None):
+    """Cell result whose seeds cover `seeds` (any result when seeds=None)."""
     for p in (result_path(ds, arch, method, regime, ipc),
               legacy_result(ds, arch, method, regime, ipc)):
         if p and os.path.exists(p):
             with open(p) as f:
                 res = json.load(f)
-            if seeds is None or res.get("seeds") == list(seeds):
+            if seeds is None or set(seeds) <= set(res.get("seeds", [])):
                 res["path"] = os.path.basename(p)
                 return res
     return None
+
+
+def pool_entries(cell, entries):
+    """Union (origin, result) entries into a seed -> [acc, secs|None] pool.
+    Duplicate seeds with differing accs, mixed set names, or mixed window
+    offsets are a hard error."""
+    pool, sets, offs = {}, set(), set()
+    for origin, r in entries:
+        if r.get("set"):
+            sets.add(r["set"])
+        if "window_offset" in r:
+            offs.add(r["window_offset"])
+        secs = r.get("seed_secs") or [None] * len(r["accs"])
+        for s, a, t in zip(r["seeds"], r["accs"], secs):
+            if s in pool and pool[s][0] != a:
+                sys.exit(f"[merge] CONFLICT {cell} seed {s}: "
+                         f"acc {pool[s][0]} vs {a} (from {origin})")
+            pool.setdefault(s, [a, t])
+    if len(sets) > 1:
+        sys.exit(f"[merge] CONFLICT {cell}: set names {sorted(sets)}")
+    if len(offs) > 1:
+        sys.exit(f"[merge] CONFLICT {cell}: window offsets {sorted(offs)}")
+    return pool, sets, offs
+
+
+def res_from_pool(ds, arch, method, regime, ipc, pool, sets, offs, entries):
+    """Canonical cell-result dict from a pooled union (search: first wins)."""
+    seeds = sorted(pool)
+    accs = [pool[s][0] for s in seeds]
+    res = {"dataset": ds, "arch": arch, "method": method, "regime": regime,
+           "ipc": ipc, "set": sorted(sets)[0] if sets else None}
+    if offs:
+        res["window_offset"] = sorted(offs)[0]
+    for origin, r in entries:
+        if "search" in r:
+            res["search"] = r["search"]
+            break
+    res.update(seeds=seeds, accs=accs, mean=float(np.mean(accs)),
+               std=float(np.std(accs)))
+    secs = [pool[s][1] for s in seeds]
+    if all(t is not None for t in secs):
+        res["seed_secs"] = [round(float(t), 1) for t in secs]
+        res["total_secs"] = round(sum(res["seed_secs"]), 1)
+    return res
+
+
+def union_write(res):
+    """Persist a freshly-run cell result, seed-unioning with any existing cell
+    JSON so new-seed runs extend rather than clobber it (no staging dir
+    needed on a live checkout). Lock-serialized across launch jobs."""
+    ds, arch = res["dataset"], res["arch"]
+    method, regime, ipc = res["method"], res["regime"], res["ipc"]
+    path = result_path(ds, arch, method, regime, ipc)
+    with artifact_lock(os.path.basename(path)):
+        loc = load_result(ds, arch, method, regime, ipc)
+        if loc is None:
+            write_json(path, res)
+            return res
+        cell = f"{ds}/{arch}/{method}/{regime}/ipc{ipc}"
+        entries = [(f"local:{loc['path']}", loc), ("run", res)]
+        pool, sets, offs = pool_entries(cell, entries)
+        out = res_from_pool(ds, arch, method, regime, ipc, pool, sets, offs,
+                            entries)
+        print(f"[cell] {cell}: union seeds {loc['seeds']} + {res['seeds']}",
+              flush=True)
+        write_json(path, out)
+    return out
 
 
 def hl_sl_setup(ds, arch, set_name, regime, ipc, device):
@@ -937,6 +1035,11 @@ def eval_cell(ds, arch, method, regime, ipc, seeds, device, smoke_epochs=None,
             print(f"[cell] cached ({res['path']}): "
                   f"{res['mean']:.2f} +- {res['std']:.2f}")
             return res
+        loc = load_result(ds, arch, method, regime, ipc)
+        if loc is not None:  # partial cell: run only the missing seeds
+            seeds = [s for s in seeds if s not in loc["seeds"]]
+            print(f"[cell] partial ({loc['path']}): have {loc['seeds']}, "
+                  f"running {seeds}", flush=True)
     t_all = time.time()
     set_name = None if method == "full" else build_set(ds, arch, method, ipc, device)
     cell = f"{ds}/{arch}/{method}/{regime}/ipc{ipc}"
@@ -969,9 +1072,9 @@ def eval_cell(ds, arch, method, regime, ipc, seeds, device, smoke_epochs=None,
         print(f"[cell] SMOKE ({smoke_epochs} ep, NOT persisted): "
               f"{res['mean']:.2f} +- {res['std']:.2f}")
         return res
-    write_json(result_path(ds, arch, method, regime, ipc), res)
+    res = union_write(res)
     print(f"[cell] {cell}: {res['mean']:.2f} +- {res['std']:.2f} "
-          f"({res['total_secs']:.0f}s)")
+          f"({res.get('total_secs', 0):.0f}s)")
     return res
 
 
@@ -980,15 +1083,18 @@ def build_el2n_window(ds, arch, ipc, off, device, devices=None):
     name = f"bench_{ds}_{arch}_el2nw{off}_ipc{ipc}"
     if os.path.exists(os.path.join(SET_DIR, name + ".pt")):
         return name
-    d = BDS[ds]
-    scores = el2n_mean(ds, arch, device, devices).numpy()
-    xtr_u8, ytr = load_train(ds)
-    keep = []
-    for idx in class_indices(ytr, d["nclass"]):
-        order = idx[np.argsort(-scores[idx], kind="stable")]
-        start = int(round(off / 100 * (len(idx) - ipc)))
-        keep.append(order[start:start + ipc])
-    save_blob(name, xtr_u8, ytr, np.concatenate(keep))
+    with artifact_lock(name):
+        if os.path.exists(os.path.join(SET_DIR, name + ".pt")):
+            return name  # built by a concurrent job while we waited
+        d = BDS[ds]
+        scores = el2n_mean(ds, arch, device, devices).numpy()
+        xtr_u8, ytr = load_train(ds)
+        keep = []
+        for idx in class_indices(ytr, d["nclass"]):
+            order = idx[np.argsort(-scores[idx], kind="stable")]
+            start = int(round(off / 100 * (len(idx) - ipc)))
+            keep.append(order[start:start + ipc])
+        save_blob(name, xtr_u8, ytr, np.concatenate(keep))
     return name
 
 
@@ -999,6 +1105,11 @@ def eval_el2nbest(ds, arch, regime, ipc, seeds, device, devices=None):
         print(f"[cell] cached ({res['path']}): "
               f"{res['mean']:.2f} +- {res['std']:.2f}")
         return res
+    loc = load_result(ds, arch, "el2nbest", regime, ipc)
+    if loc is not None:  # partial cell: run only the missing seeds
+        seeds = [s for s in seeds if s not in loc["seeds"]]
+        print(f"[cell] partial ({loc['path']}): have {loc['seeds']}, "
+              f"running {seeds}", flush=True)
     t_all = time.time()
     cell = f"{ds}/{arch}/el2nbest/{regime}/ipc{ipc}"
     search_p = os.path.join(RESULT_DIR,
@@ -1064,7 +1175,7 @@ def eval_el2nbest(ds, arch, regime, ipc, seeds, device, devices=None):
            "search": search, "seeds": res_seeds, "accs": accs,
            "mean": float(np.mean(accs)), "std": float(np.std(accs)),
            "seed_secs": secs, "total_secs": round(time.time() - t_all, 1)}
-    write_json(result_path(ds, arch, "el2nbest", regime, ipc), res)
+    res = union_write(res)
     print(f"[cell] {cell}: {res['mean']:.2f} +- {res['std']:.2f} "
           f"(window {best_off}%)")
     return res
@@ -1425,42 +1536,14 @@ def cmd_merge(dirs, dry_run=False):
         loc = load_result(ds, arch, method, regime, ipc)
         if loc is not None:
             entries.insert(0, (f"local:{loc['path']}", loc))
-        pool, sets, offs = {}, set(), set()   # seed -> [acc, secs|None]
-        for origin, r in entries:
-            if r.get("set"):
-                sets.add(r["set"])
-            if "window_offset" in r:
-                offs.add(r["window_offset"])
-            secs = r.get("seed_secs") or [None] * len(r["accs"])
-            for s, a, t in zip(r["seeds"], r["accs"], secs):
-                if s in pool and pool[s][0] != a:
-                    sys.exit(f"[merge] CONFLICT {cell} seed {s}: "
-                             f"acc {pool[s][0]} vs {a} (from {origin})")
-                pool.setdefault(s, [a, t])
-        if len(sets) > 1:
-            sys.exit(f"[merge] CONFLICT {cell}: set names {sorted(sets)}")
-        if len(offs) > 1:
-            sys.exit(f"[merge] CONFLICT {cell}: window offsets {sorted(offs)}")
+        pool, sets, offs = pool_entries(cell, entries)
         old = sorted(loc["seeds"]) if loc else []
         seeds = sorted(pool)
         if seeds == old:
             n_same += 1
             continue
-        accs = [pool[s][0] for s in seeds]
-        res = {"dataset": ds, "arch": arch, "method": method, "regime": regime,
-               "ipc": ipc, "set": sorted(sets)[0] if sets else None}
-        if offs:
-            res["window_offset"] = sorted(offs)[0]
-        for origin, r in entries:
-            if "search" in r:
-                res["search"] = r["search"]
-                break
-        res.update(seeds=seeds, accs=accs, mean=float(np.mean(accs)),
-                   std=float(np.std(accs)))
-        secs = [pool[s][1] for s in seeds]
-        if all(t is not None for t in secs):
-            res["seed_secs"] = [round(float(t), 1) for t in secs]
-            res["total_secs"] = round(sum(res["seed_secs"]), 1)
+        res = res_from_pool(ds, arch, method, regime, ipc, pool, sets, offs,
+                            entries)
         print(f"[merge] {tag}{cell}: seeds {old} -> {seeds}  "
               f"{res['mean']:.2f} +- {res['std']:.2f}")
         if not dry_run:
@@ -1583,9 +1666,10 @@ def cmd_launch(plan_path, dry_run=False):
                       f"{cs[0]} (both would write "
                       f"{os.path.basename(result_path(*cs[0]))})")
     for (a, b), ks in warns.items():
-        print(f"[launch] WARNING: jobs '{a}' and '{b}' share {len(set(ks))} "
-              f"selection cache(s), e.g. {ks[0]}: safe only if artifacts/"
-              f"sets+scores are prewarmed (rsynced)")
+        print(f"[launch] NOTE: jobs '{a}' and '{b}' share {len(set(ks))} "
+              f"selection cache(s), e.g. {ks[0]}: missing ones are built once "
+              f"(lock-serialized); prewarm artifacts/sets+scores to avoid "
+              f"idle waits")
     if errors:
         for e in errors:
             print(f"[launch] ERROR: {e}")
