@@ -1,0 +1,63 @@
+{
+  "dataset": "cifar100",
+  "arch": "conv",
+  "method": "el2nbest",
+  "regime": "hl",
+  "ipc": 50,
+  "set": "bench_cifar100_conv_el2nw80_ipc50",
+  "window_offset": 80,
+  "search": {
+    "0": {
+      "acc": 7.28,
+      "secs": 65.8
+    },
+    "10": {
+      "acc": 15.53,
+      "secs": 68.7
+    },
+    "20": {
+      "acc": 22.99,
+      "secs": 69.4
+    },
+    "30": {
+      "acc": 27.85,
+      "secs": 69.5
+    },
+    "40": {
+      "acc": 32.11,
+      "secs": 69.7
+    },
+    "50": {
+      "acc": 35.51,
+      "secs": 69.5
+    },
+    "60": {
+      "acc": 38.06,
+      "secs": 69.7
+    },
+    "70": {
+      "acc": 38.9,
+      "secs": 69.5
+    },
+    "80": {
+      "acc": 39.7,
+      "secs": 69.8
+    },
+    "90": {
+      "acc": 39.57,
+      "secs": 69.6
+    }
+  },
+  "seeds": [
+    46
+  ],
+  "accs": [
+    39.95
+  ],
+  "mean": 39.95,
+  "std": 0.0,
+  "seed_secs": [
+    37.0
+  ],
+  "total_secs": 38.0
+}

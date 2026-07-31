@@ -1,0 +1,14 @@
+/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/cuda/__init__.py:611: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+=> using pytorch pre-trained teacher model 'conv3'
+process data from /home/dvspanos/nikos/ca2d/artifacts/rded/data/cifar100/train
+load data successfully
+TRAIN Iter 0: loss = 0.011185,	Top-1 err = 86.280000,	Top-5 err = 65.200000,	train_time = 12.975999
+TRAIN Iter 1: loss = 0.006536,	Top-1 err = 77.324000,	Top-5 err = 51.922000,	train_time = 12.661837
+TRAIN Iter 2: loss = 0.005288,	Top-1 err = 73.998000,	Top-5 err = 48.320000,	train_time = 12.122084
+TRAIN Iter 3: loss = 0.004618,	Top-1 err = 72.534000,	Top-5 err = 46.990000,	train_time = 12.293713
+TRAIN Iter 4: loss = 0.004189,	Top-1 err = 70.936000,	Top-5 err = 45.396000,	train_time = 12.077594
+TRAIN Iter 5: loss = 0.003818,	Top-1 err = 71.074000,	Top-5 err = 45.380000,	train_time = 12.476607
+TEST:
+Iter 5: loss = 1.776127,	Top-1 err = 45.660000,	Top-5 err = 17.340000,	val_time = 0.781182
+Train Finish! Best accuracy is 54.34@5

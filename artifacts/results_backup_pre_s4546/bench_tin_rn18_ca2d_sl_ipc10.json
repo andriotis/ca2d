@@ -1,0 +1,26 @@
+{
+  "dataset": "tin",
+  "arch": "rn18",
+  "method": "ca2d",
+  "regime": "sl",
+  "ipc": 10,
+  "set": "bench_tin_rn18_ca2d_ipc10",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    12.49,
+    13.38,
+    14.11
+  ],
+  "mean": 13.326666666666668,
+  "std": 0.6624365797736579,
+  "seed_secs": [
+    555.0,
+    555.0,
+    554.4
+  ],
+  "total_secs": 1666.5
+}

@@ -1,0 +1,15 @@
+jobs:
+  - name: kd-ca2d-rded
+    table: rn18-tin
+    seeds: [42, 43, 44, 45, 46]
+    regimes: [kd]
+    ipcs: [100]
+    methods: [ca2d, rded]
+    devices: [cuda:0]
+  - name: rcad-sl-kd
+    table: rn18-tin
+    seeds: [42, 43, 44, 45, 46]
+    regimes: [sl, kd]
+    ipcs: [100]
+    methods: [rcad]
+    devices: [cuda:1]

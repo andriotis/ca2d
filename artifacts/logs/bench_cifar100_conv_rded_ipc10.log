@@ -1,0 +1,1 @@
+Namespace(subset='cifar100', arch_name='conv3', nclass=100, mipc=300, ipc=10, num_crop=5, factor=1, input_size=32, train_dir='/home/dvspanos/nikos/ca2d/artifacts/rded/data/cifar100/train', syn_data_path='/home/dvspanos/nikos/ca2d/artifacts/sets/bench_cifar100_conv_rded_ipc10', workers=4, classes=range(0, 100))

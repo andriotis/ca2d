@@ -1,0 +1,14 @@
+{
+  "mode": "synth",
+  "subset": "tinyimagenet",
+  "arch_name": "conv4",
+  "nclass": 200,
+  "mipc": 300,
+  "ipc": 50,
+  "num_crop": 5,
+  "factor": 1,
+  "input_size": 64,
+  "train_dir": "/home/dvspanos/nikos/ca2d/artifacts/rded/data/tinyimagenet/train",
+  "syn_data_path": "/home/dvspanos/nikos/ca2d/artifacts/sets/bench_tin_conv_rded_ipc50",
+  "workers": 4
+}

@@ -1,0 +1,15 @@
+# symphony2 (1x 4090) PHASE 2 of 2 — conv-TIN backfill.
+# Only ipc100 conv-tin cells still lack the 42-44 baselines (ipc10/50 are
+# already n=5 via the legacy JSONs). All 9 methods, seeds 42-46 (resume fills
+# only the missing 42,43,44). conv is light (~0.8 d on the 4090). No other
+# server touches conv-tin -> trivially disjoint.
+# Needs conv-tin ipc100 sets + el2nsearch rsynced from df1 (RUNBOOK step 1).
+# Launched chained after symphony2-df1tin.yaml (see that file's header).
+jobs:
+  - name: convtin-ip100-all
+    table: conv-tin
+    seeds: [42, 43, 44, 45, 46]
+    regimes: [hl, sl, kd]
+    ipcs: [100]
+    methods: [random, el2nbest, cadprune, sharp, rcad, rded, ca2d, sharp2d, rcad2d]
+    devices: [cuda:0]

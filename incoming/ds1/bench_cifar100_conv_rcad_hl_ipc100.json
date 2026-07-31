@@ -1,0 +1,20 @@
+{
+  "dataset": "cifar100",
+  "arch": "conv",
+  "method": "rcad",
+  "regime": "hl",
+  "ipc": 100,
+  "set": "bench_cifar100_conv_rcad_ipc100",
+  "seeds": [
+    45
+  ],
+  "accs": [
+    43.65
+  ],
+  "mean": 43.65,
+  "std": 0.0,
+  "seed_secs": [
+    193.3
+  ],
+  "total_secs": 194.6
+}

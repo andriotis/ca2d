@@ -1,0 +1,23 @@
+{
+  "dataset": "tin",
+  "arch": "rn18",
+  "method": "random",
+  "regime": "kd",
+  "ipc": 100,
+  "set": "bench_tin_random_ipc100",
+  "seeds": [
+    45,
+    46
+  ],
+  "accs": [
+    59.69,
+    59.37
+  ],
+  "mean": 59.53,
+  "std": 0.16000000000000014,
+  "seed_secs": [
+    9829.4,
+    9710.1
+  ],
+  "total_secs": 19554.0
+}

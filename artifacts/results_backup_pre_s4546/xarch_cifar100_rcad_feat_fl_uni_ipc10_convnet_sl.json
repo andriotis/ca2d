@@ -1,0 +1,25 @@
+{
+  "dataset": "cifar100",
+  "name": "rcad_feat_fl_uni_ipc10",
+  "arch": "convnet",
+  "regime": "sl",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    30.32,
+    30.65,
+    30.26
+  ],
+  "mean": 30.41,
+  "std": 0.1714642819948213,
+  "seed_secs": [
+    58.2,
+    58.2,
+    58.1
+  ],
+  "total_secs": 177.8,
+  "batch": 256
+}

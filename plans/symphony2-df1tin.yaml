@@ -1,0 +1,15 @@
+# symphony2 (1x 4090) PHASE 1 of 2 — rn18-TIN, the 3 methods df1 does NOT do.
+# Disjoint from deepfinance1-final.yaml by method -> no shared (cell,seed).
+# Chain phase 2 (conv-tin) after it:
+#   tmux new -s bench 'python bench.py launch plans/symphony2-df1tin.yaml && \
+#     python bench.py launch plans/symphony2-convtin.yaml'
+# Needs rn18-tin sets rsynced from df1 first (RUNBOOK-df1-split.md step 1).
+# ~4.8 d for this phase (+~0.8 d for conv-tin).
+jobs:
+  - name: tin-ca2d-rded-rcad
+    table: rn18-tin
+    seeds: [42, 43, 44, 45, 46]
+    regimes: [hl, sl, kd]
+    ipcs: [10, 50, 100]
+    methods: [ca2d, rded, rcad]
+    devices: [cuda:0]

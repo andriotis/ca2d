@@ -1,0 +1,20 @@
+{
+  "dataset": "tin",
+  "arch": "conv",
+  "method": "ca2d",
+  "regime": "kd",
+  "ipc": 100,
+  "set": "bench_tin_conv_ca2d_ipc100",
+  "seeds": [
+    45
+  ],
+  "accs": [
+    49.38
+  ],
+  "mean": 49.38,
+  "std": 0.0,
+  "seed_secs": [
+    1877.3
+  ],
+  "total_secs": 1877.3
+}

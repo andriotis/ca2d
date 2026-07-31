@@ -1,0 +1,63 @@
+{
+  "dataset": "tin",
+  "arch": "conv",
+  "method": "el2nbest",
+  "regime": "hl",
+  "ipc": 10,
+  "set": "bench_tin_conv_el2nw90_ipc10",
+  "window_offset": 90,
+  "search": {
+    "0": {
+      "acc": 1.48,
+      "secs": 441.1
+    },
+    "10": {
+      "acc": 2.14,
+      "secs": 442.4
+    },
+    "20": {
+      "acc": 3.2,
+      "secs": 447.2
+    },
+    "30": {
+      "acc": 4.2,
+      "secs": 448.5
+    },
+    "40": {
+      "acc": 5.61,
+      "secs": 452.3
+    },
+    "50": {
+      "acc": 6.3,
+      "secs": 452.9
+    },
+    "60": {
+      "acc": 7.87,
+      "secs": 452.6
+    },
+    "70": {
+      "acc": 8.96,
+      "secs": 450.4
+    },
+    "80": {
+      "acc": 10.69,
+      "secs": 449.2
+    },
+    "90": {
+      "acc": 12.16,
+      "secs": 451.7
+    }
+  },
+  "seeds": [
+    45
+  ],
+  "accs": [
+    11.86
+  ],
+  "mean": 11.86,
+  "std": 0.0,
+  "seed_secs": [
+    110.2
+  ],
+  "total_secs": 111.1
+}

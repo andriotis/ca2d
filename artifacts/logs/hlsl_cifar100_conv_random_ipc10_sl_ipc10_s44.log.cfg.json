@@ -1,0 +1,9 @@
+{
+  "kind": "hlsl",
+  "ds": "cifar100",
+  "arch": "conv",
+  "set": "random_ipc10",
+  "regime": "sl",
+  "ipc": 10,
+  "seed": 44
+}

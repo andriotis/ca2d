@@ -1,0 +1,26 @@
+{
+  "dataset": "cifar100",
+  "arch": "rn18",
+  "method": "sharp2d",
+  "regime": "kd",
+  "ipc": 50,
+  "set": "bench_cifar100_rn18_sharp2d_ipc50",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    63.56,
+    63.17,
+    63.59
+  ],
+  "mean": 63.44,
+  "std": 0.19131126469709048,
+  "seed_secs": [
+    2419.4,
+    2419.9,
+    2420.1
+  ],
+  "total_secs": 7259.4
+}

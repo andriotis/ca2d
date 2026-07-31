@@ -1,0 +1,55 @@
+/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+=> using pytorch pre-trained teacher model 'resnet18_modified'
+process data from /home/dvspanos/nikos/ca2d/artifacts/rded_sets/tin_random_ipc10
+load data successfully
+Traceback (most recent call last):
+  File "/home/dvspanos/nikos/ca2d/bench.py", line 1495, in <module>
+    sys.exit(main() or 0)
+  File "/home/dvspanos/nikos/ca2d/bench.py", line 1449, in main
+    return cmd_rded_worker(args.cfg, selfcheck=args.selfcheck)
+  File "/home/dvspanos/nikos/ca2d/bench.py", line 696, in cmd_rded_worker
+    vmain.main(ns)
+  File "/home/dvspanos/nikos/RDED/validation/main.py", line 48, in main
+    main_worker(args)
+  File "/home/dvspanos/nikos/RDED/validation/main.py", line 177, in main_worker
+    train(epoch, train_loader, teacher_model, student_model, args)
+  File "/home/dvspanos/nikos/RDED/validation/main.py", line 223, in train
+    pred_mix_label = student_model(mix_images)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/nn/parallel/data_parallel.py", line 183, in forward
+    return self.module(*inputs[0], **module_kwargs[0])
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torchvision/models/resnet.py", line 285, in forward
+    return self._forward_impl(x)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torchvision/models/resnet.py", line 273, in _forward_impl
+    x = self.layer1(x)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/nn/modules/container.py", line 215, in forward
+    input = module(input)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torchvision/models/resnet.py", line 93, in forward
+    out = self.bn1(out)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/nn/modules/batchnorm.py", line 171, in forward
+    return F.batch_norm(
+  File "/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/nn/functional.py", line 2478, in batch_norm
+    return torch.batch_norm(
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 100.00 MiB. GPU 0 has a total capacty of 23.69 GiB of which 101.00 MiB is free. Process 1039398 has 22.47 GiB memory in use. Including non-PyTorch memory, this process has 1.10 GiB memory in use. Of the allocated memory 800.82 MiB is allocated by PyTorch, and 9.18 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF

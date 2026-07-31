@@ -1,0 +1,80 @@
+/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+=> using pytorch pre-trained teacher model 'resnet18_modified'
+process data from /home/dvspanos/nikos/ca2d/artifacts/sets/bench_tin_rn18_ca2d_ipc50
+load data successfully
+TRAIN Iter 0: loss = 0.016370,	Top-1 err = 97.880000,	Top-5 err = 91.410000,	train_time = 15.378656
+TRAIN Iter 1: loss = 0.014621,	Top-1 err = 95.350000,	Top-5 err = 84.360000,	train_time = 14.107979
+TRAIN Iter 2: loss = 0.014069,	Top-1 err = 93.150000,	Top-5 err = 78.610000,	train_time = 14.330837
+TRAIN Iter 3: loss = 0.012512,	Top-1 err = 92.380000,	Top-5 err = 76.580000,	train_time = 14.480063
+TRAIN Iter 4: loss = 0.012427,	Top-1 err = 89.080000,	Top-5 err = 70.240000,	train_time = 15.123077
+TRAIN Iter 5: loss = 0.012324,	Top-1 err = 86.310000,	Top-5 err = 65.650000,	train_time = 14.775142
+TRAIN Iter 6: loss = 0.012117,	Top-1 err = 83.180000,	Top-5 err = 60.560000,	train_time = 14.625695
+TRAIN Iter 7: loss = 0.011270,	Top-1 err = 80.850000,	Top-5 err = 58.670000,	train_time = 14.832751
+TRAIN Iter 8: loss = 0.010539,	Top-1 err = 80.990000,	Top-5 err = 59.220000,	train_time = 16.087143
+TRAIN Iter 9: loss = 0.010414,	Top-1 err = 77.650000,	Top-5 err = 53.270000,	train_time = 14.578684
+TRAIN Iter 10: loss = 0.010108,	Top-1 err = 76.700000,	Top-5 err = 53.320000,	train_time = 14.760676
+TRAIN Iter 11: loss = 0.010429,	Top-1 err = 71.320000,	Top-5 err = 46.970000,	train_time = 15.853931
+TRAIN Iter 12: loss = 0.009727,	Top-1 err = 70.460000,	Top-5 err = 45.980000,	train_time = 15.200780
+TRAIN Iter 13: loss = 0.009555,	Top-1 err = 70.130000,	Top-5 err = 46.910000,	train_time = 14.602650
+TRAIN Iter 14: loss = 0.009216,	Top-1 err = 68.180000,	Top-5 err = 44.630000,	train_time = 15.642910
+TRAIN Iter 15: loss = 0.008972,	Top-1 err = 65.370000,	Top-5 err = 40.910000,	train_time = 15.070399
+TRAIN Iter 16: loss = 0.008880,	Top-1 err = 63.630000,	Top-5 err = 40.540000,	train_time = 14.809920
+TRAIN Iter 17: loss = 0.008430,	Top-1 err = 63.860000,	Top-5 err = 40.960000,	train_time = 14.883785
+TRAIN Iter 18: loss = 0.008342,	Top-1 err = 62.970000,	Top-5 err = 40.240000,	train_time = 15.834488
+TRAIN Iter 19: loss = 0.008002,	Top-1 err = 59.330000,	Top-5 err = 36.310000,	train_time = 14.398038
+TRAIN Iter 20: loss = 0.007801,	Top-1 err = 61.070000,	Top-5 err = 39.670000,	train_time = 14.642480
+TRAIN Iter 21: loss = 0.007652,	Top-1 err = 60.250000,	Top-5 err = 39.280000,	train_time = 15.944249
+TRAIN Iter 22: loss = 0.007680,	Top-1 err = 55.220000,	Top-5 err = 33.640000,	train_time = 14.378685
+TRAIN Iter 23: loss = 0.007432,	Top-1 err = 54.130000,	Top-5 err = 30.740000,	train_time = 14.924630
+TRAIN Iter 24: loss = 0.007172,	Top-1 err = 55.510000,	Top-5 err = 34.120000,	train_time = 15.097790
+TRAIN Iter 25: loss = 0.006959,	Top-1 err = 53.100000,	Top-5 err = 31.770000,	train_time = 15.427790
+TRAIN Iter 26: loss = 0.006870,	Top-1 err = 51.540000,	Top-5 err = 31.200000,	train_time = 14.916727
+TRAIN Iter 27: loss = 0.006554,	Top-1 err = 52.870000,	Top-5 err = 31.870000,	train_time = 15.441282
+TRAIN Iter 28: loss = 0.006731,	Top-1 err = 49.850000,	Top-5 err = 29.720000,	train_time = 14.404908
+TRAIN Iter 29: loss = 0.006511,	Top-1 err = 43.320000,	Top-5 err = 22.450000,	train_time = 15.557322
+TRAIN Iter 30: loss = 0.006326,	Top-1 err = 52.680000,	Top-5 err = 32.430000,	train_time = 14.454646
+TRAIN Iter 31: loss = 0.006266,	Top-1 err = 45.750000,	Top-5 err = 26.170000,	train_time = 14.856113
+TRAIN Iter 32: loss = 0.006130,	Top-1 err = 44.620000,	Top-5 err = 24.350000,	train_time = 14.711709
+TRAIN Iter 33: loss = 0.006048,	Top-1 err = 51.730000,	Top-5 err = 32.160000,	train_time = 15.625177
+TRAIN Iter 34: loss = 0.005807,	Top-1 err = 54.010000,	Top-5 err = 34.030000,	train_time = 14.736514
+TRAIN Iter 35: loss = 0.005848,	Top-1 err = 45.170000,	Top-5 err = 26.420000,	train_time = 14.713154
+TRAIN Iter 36: loss = 0.005793,	Top-1 err = 41.650000,	Top-5 err = 24.280000,	train_time = 15.379960
+TRAIN Iter 37: loss = 0.005617,	Top-1 err = 44.970000,	Top-5 err = 25.800000,	train_time = 14.590378
+TRAIN Iter 38: loss = 0.005528,	Top-1 err = 50.040000,	Top-5 err = 31.950000,	train_time = 15.424365
+TRAIN Iter 39: loss = 0.005516,	Top-1 err = 44.390000,	Top-5 err = 26.500000,	train_time = 15.402824
+TRAIN Iter 40: loss = 0.005350,	Top-1 err = 44.070000,	Top-5 err = 25.000000,	train_time = 14.856259
+TRAIN Iter 41: loss = 0.005431,	Top-1 err = 49.060000,	Top-5 err = 30.490000,	train_time = 15.520395
+TRAIN Iter 42: loss = 0.005412,	Top-1 err = 36.920000,	Top-5 err = 20.860000,	train_time = 14.593279
+TRAIN Iter 43: loss = 0.005283,	Top-1 err = 46.130000,	Top-5 err = 29.220000,	train_time = 14.411687
+TRAIN Iter 44: loss = 0.005191,	Top-1 err = 42.950000,	Top-5 err = 25.840000,	train_time = 14.771384
+TRAIN Iter 45: loss = 0.005095,	Top-1 err = 48.140000,	Top-5 err = 29.640000,	train_time = 15.015701
+TRAIN Iter 46: loss = 0.005059,	Top-1 err = 45.610000,	Top-5 err = 28.260000,	train_time = 15.540455
+TRAIN Iter 47: loss = 0.004969,	Top-1 err = 46.100000,	Top-5 err = 28.300000,	train_time = 14.862211
+TRAIN Iter 48: loss = 0.004958,	Top-1 err = 36.530000,	Top-5 err = 20.280000,	train_time = 14.617614
+TRAIN Iter 49: loss = 0.005010,	Top-1 err = 41.660000,	Top-5 err = 25.240000,	train_time = 14.922725
+TRAIN Iter 50: loss = 0.004865,	Top-1 err = 43.360000,	Top-5 err = 24.740000,	train_time = 15.379014
+TRAIN Iter 51: loss = 0.004782,	Top-1 err = 43.620000,	Top-5 err = 25.260000,	train_time = 14.607498
+TRAIN Iter 52: loss = 0.004770,	Top-1 err = 43.580000,	Top-5 err = 25.990000,	train_time = 14.637764
+TRAIN Iter 53: loss = 0.004805,	Top-1 err = 44.830000,	Top-5 err = 27.920000,	train_time = 16.009037
+TRAIN Iter 54: loss = 0.004698,	Top-1 err = 43.150000,	Top-5 err = 26.400000,	train_time = 14.554544
+TRAIN Iter 55: loss = 0.004731,	Top-1 err = 36.360000,	Top-5 err = 20.420000,	train_time = 15.059709
+TRAIN Iter 56: loss = 0.004683,	Top-1 err = 41.790000,	Top-5 err = 25.330000,	train_time = 14.658526
+TRAIN Iter 57: loss = 0.004599,	Top-1 err = 35.480000,	Top-5 err = 20.230000,	train_time = 16.019169
+TRAIN Iter 58: loss = 0.004590,	Top-1 err = 33.800000,	Top-5 err = 18.560000,	train_time = 14.695753
+TRAIN Iter 59: loss = 0.004596,	Top-1 err = 35.750000,	Top-5 err = 19.540000,	train_time = 14.764124
+TRAIN Iter 60: loss = 0.004490,	Top-1 err = 40.710000,	Top-5 err = 23.880000,	train_time = 15.098985
+TRAIN Iter 61: loss = 0.004474,	Top-1 err = 42.340000,	Top-5 err = 26.190000,	train_time = 15.848479
+TRAIN Iter 62: loss = 0.004456,	Top-1 err = 40.440000,	Top-5 err = 23.190000,	train_time = 15.106307
+TRAIN Iter 63: loss = 0.004406,	Top-1 err = 37.320000,	Top-5 err = 20.480000,	train_time = 14.803310
+TRAIN Iter 64: loss = 0.004381,	Top-1 err = 41.490000,	Top-5 err = 25.580000,	train_time = 14.488831
+TRAIN Iter 65: loss = 0.004384,	Top-1 err = 30.870000,	Top-5 err = 16.900000,	train_time = 15.656925
+TRAIN Iter 66: loss = 0.004315,	Top-1 err = 39.460000,	Top-5 err = 24.020000,	train_time = 14.697898
+TRAIN Iter 67: loss = 0.004267,	Top-1 err = 38.650000,	Top-5 err = 23.820000,	train_time = 15.034921
+TRAIN Iter 68: loss = 0.004217,	Top-1 err = 44.300000,	Top-5 err = 26.180000,	train_time = 14.974919
+TRAIN Iter 69: loss = 0.004206,	Top-1 err = 39.480000,	Top-5 err = 23.100000,	train_time = 15.617775
+TRAIN Iter 70: loss = 0.004222,	Top-1 err = 44.680000,	Top-5 err = 28.630000,	train_time = 14.653826
+TRAIN Iter 71: loss = 0.004181,	Top-1 err = 35.590000,	Top-5 err = 20.360000,	train_time = 15.003479
+TRAIN Iter 72: loss = 0.004191,	Top-1 err = 45.250000,	Top-5 err = 29.900000,	train_time = 15.614234

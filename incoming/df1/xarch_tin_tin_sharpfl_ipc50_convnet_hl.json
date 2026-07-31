@@ -1,0 +1,25 @@
+{
+  "dataset": "tin",
+  "name": "tin_sharpfl_ipc50",
+  "arch": "convnet",
+  "regime": "hl",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    21.84,
+    21.98,
+    21.46
+  ],
+  "mean": 21.76,
+  "std": 0.21969676071045416,
+  "seed_secs": [
+    664.4,
+    670.6,
+    646.7
+  ],
+  "total_secs": 1983.6,
+  "batch": 256
+}

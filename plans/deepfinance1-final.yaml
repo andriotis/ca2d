@@ -1,0 +1,38 @@
+# df1 (3x3090) — REPLACES deepfinance1-phase{1,2}.yaml.
+# GOAL CHANGED: bring every cell of all four tables to n=5 (seeds 42-46), not
+# just 45,46. That is ~2.3x the original work (many ipc100/kd cells never had
+# the 42-44 baselines either), so it is split across all three servers:
+#   df1  -> rn18-TIN,   6 of 9 methods          (this file)
+#   s2   -> rn18-TIN,   other 3 methods + conv-tin  (symphony2-*.yaml)
+#   ds1  -> rn18-CIFAR100, all methods          (deepstream1-df1cifar.yaml)
+# Method split is disjoint from s2's, so no (cell,seed) is shared -> merge
+# never conflicts. ~5.6 days on df1.
+#
+# seeds:[42..46] + full grid: eval_cell runs ONLY the seeds each cell lacks and
+# seed-unions them (already-n=5 cells cached-skip instantly). One single-device
+# job per GPU (a cell's seeds run serially on its GPU). Pairs balanced by cost.
+#
+# STOP the current run first, then:
+#   tmux new -s bench 'python bench.py launch plans/deepfinance1-final.yaml'
+jobs:
+  - name: tin-random-rcad2d
+    table: rn18-tin
+    seeds: [42, 43, 44, 45, 46]
+    regimes: [hl, sl, kd]
+    ipcs: [10, 50, 100]
+    methods: [random, rcad2d]
+    devices: [cuda:0]
+  - name: tin-el2nbest-sharp2d
+    table: rn18-tin
+    seeds: [42, 43, 44, 45, 46]
+    regimes: [hl, sl, kd]
+    ipcs: [10, 50, 100]
+    methods: [el2nbest, sharp2d]
+    devices: [cuda:1]
+  - name: tin-cadprune-sharp
+    table: rn18-tin
+    seeds: [42, 43, 44, 45, 46]
+    regimes: [hl, sl, kd]
+    ipcs: [10, 50, 100]
+    methods: [cadprune, sharp]
+    devices: [cuda:2]

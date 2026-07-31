@@ -1,0 +1,30 @@
+# deepstream1 (2x 3080, 10GB) — ALL of rn18-CIFAR100 to n=5 (seeds 42-46).
+# Every cifar cell is incomplete (0/81 had 45,46; 35 also lack 42-44), so this
+# is the whole table. Different table from df1/s2 -> trivially disjoint.
+#
+# TWO single-device jobs (NOT one 2-device job): with cells needing a varying
+# 2-5 seeds, a per-GPU method split keeps each 3080 at ~100% util, whereas a
+# 2-device seed-pool wastes a GPU on the last wave. The 4/5 method split is
+# chosen by cost (the 4 heavy methods vs 5 lighter) so both GPUs land ~5.7-5.9d
+# — this is the makespan bottleneck of the whole run.
+#
+# 3080 MEMORY: these CANNOT build rn18 artifacts (full-dataset scoring OOMs
+# 10GB). Prewarm scores+sets+el2nsearch from df1 FIRST (RUNBOOK step 1);
+# --dry-run warns on any uncached scoring. cifar (32x32) set-sized cells fit.
+#   python bench.py launch plans/deepstream1-df1cifar.yaml --dry-run
+#   tmux new -s bench 'python bench.py launch plans/deepstream1-df1cifar.yaml'
+jobs:
+  - name: cifar-heavy4
+    table: rn18-cifar100
+    seeds: [42, 43, 44, 45, 46]
+    regimes: [hl, sl, kd]
+    ipcs: [10, 50, 100]
+    methods: [el2nbest, cadprune, sharp, rcad]
+    devices: [cuda:0]
+  - name: cifar-light5
+    table: rn18-cifar100
+    seeds: [42, 43, 44, 45, 46]
+    regimes: [hl, sl, kd]
+    ipcs: [10, 50, 100]
+    methods: [random, rded, ca2d, sharp2d, rcad2d]
+    devices: [cuda:1]

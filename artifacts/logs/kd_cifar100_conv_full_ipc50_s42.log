@@ -1,0 +1,38 @@
+/home/dvspanos/miniconda3/envs/rded/lib/python3.10/site-packages/torch/cuda/__init__.py:611: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+=> using pytorch pre-trained teacher model 'conv3'
+process data from /home/dvspanos/nikos/ca2d/artifacts/rded/data/cifar100/train
+load data successfully
+TRAIN Iter 0: loss = 0.011174,	Top-1 err = 86.210000,	Top-5 err = 64.990000,	train_time = 12.830090
+TRAIN Iter 1: loss = 0.006534,	Top-1 err = 77.244000,	Top-5 err = 51.940000,	train_time = 12.352401
+TRAIN Iter 2: loss = 0.005324,	Top-1 err = 74.140000,	Top-5 err = 48.390000,	train_time = 12.097006
+TRAIN Iter 3: loss = 0.004675,	Top-1 err = 72.732000,	Top-5 err = 47.200000,	train_time = 12.312169
+TRAIN Iter 4: loss = 0.004286,	Top-1 err = 71.316000,	Top-5 err = 45.860000,	train_time = 12.418666
+TRAIN Iter 5: loss = 0.003948,	Top-1 err = 71.380000,	Top-5 err = 45.916000,	train_time = 12.225693
+TRAIN Iter 6: loss = 0.003690,	Top-1 err = 70.498000,	Top-5 err = 45.782000,	train_time = 12.261589
+TRAIN Iter 7: loss = 0.003441,	Top-1 err = 70.120000,	Top-5 err = 44.998000,	train_time = 12.349353
+TRAIN Iter 8: loss = 0.003258,	Top-1 err = 69.756000,	Top-5 err = 45.042000,	train_time = 12.418737
+TRAIN Iter 9: loss = 0.003101,	Top-1 err = 70.136000,	Top-5 err = 45.230000,	train_time = 12.284924
+TRAIN Iter 10: loss = 0.002939,	Top-1 err = 68.992000,	Top-5 err = 43.952000,	train_time = 12.299132
+TRAIN Iter 11: loss = 0.002781,	Top-1 err = 68.556000,	Top-5 err = 44.040000,	train_time = 12.157437
+TRAIN Iter 12: loss = 0.002670,	Top-1 err = 67.974000,	Top-5 err = 42.880000,	train_time = 12.306645
+TRAIN Iter 13: loss = 0.002554,	Top-1 err = 67.898000,	Top-5 err = 42.544000,	train_time = 12.171901
+TRAIN Iter 14: loss = 0.002457,	Top-1 err = 67.892000,	Top-5 err = 43.022000,	train_time = 12.211622
+TRAIN Iter 15: loss = 0.002389,	Top-1 err = 67.970000,	Top-5 err = 43.152000,	train_time = 12.334225
+TRAIN Iter 16: loss = 0.002293,	Top-1 err = 67.004000,	Top-5 err = 42.082000,	train_time = 12.287624
+TRAIN Iter 17: loss = 0.002223,	Top-1 err = 67.496000,	Top-5 err = 42.692000,	train_time = 12.256878
+TRAIN Iter 18: loss = 0.002171,	Top-1 err = 67.740000,	Top-5 err = 43.410000,	train_time = 12.263864
+TRAIN Iter 19: loss = 0.002100,	Top-1 err = 67.230000,	Top-5 err = 42.166000,	train_time = 12.414403
+TRAIN Iter 20: loss = 0.002029,	Top-1 err = 66.328000,	Top-5 err = 41.506000,	train_time = 12.406117
+TRAIN Iter 21: loss = 0.001967,	Top-1 err = 66.358000,	Top-5 err = 41.374000,	train_time = 11.764797
+TRAIN Iter 22: loss = 0.001938,	Top-1 err = 66.396000,	Top-5 err = 41.880000,	train_time = 12.101177
+TRAIN Iter 23: loss = 0.001887,	Top-1 err = 67.728000,	Top-5 err = 42.812000,	train_time = 12.124259
+TRAIN Iter 24: loss = 0.001841,	Top-1 err = 66.706000,	Top-5 err = 42.500000,	train_time = 12.287923
+TRAIN Iter 25: loss = 0.001791,	Top-1 err = 66.694000,	Top-5 err = 41.970000,	train_time = 12.303463
+TRAIN Iter 26: loss = 0.001751,	Top-1 err = 65.842000,	Top-5 err = 41.198000,	train_time = 12.171086
+TRAIN Iter 27: loss = 0.001695,	Top-1 err = 66.700000,	Top-5 err = 42.298000,	train_time = 12.439868
+TRAIN Iter 28: loss = 0.001675,	Top-1 err = 66.738000,	Top-5 err = 42.162000,	train_time = 11.960718
+TRAIN Iter 29: loss = 0.001638,	Top-1 err = 65.318000,	Top-5 err = 40.218000,	train_time = 12.064730
+TEST:
+Iter 29: loss = 1.634688,	Top-1 err = 41.210000,	Top-5 err = 15.280000,	val_time = 0.838493
+Train Finish! Best accuracy is 58.79@29

@@ -1,0 +1,12 @@
+=> using pytorch pre-trained teacher model 'conv3'
+process data from /home/dvspanos/nikos/ca2d/artifacts/rded_sets/random_ipc10
+load data successfully
+TRAIN Iter 0: loss = 0.020900,	Top-1 err = 97.400000,	Top-5 err = 90.800000,	train_time = 1.193003
+TRAIN Iter 1: loss = 0.019041,	Top-1 err = 97.000000,	Top-5 err = 88.000000,	train_time = 0.336301
+TRAIN Iter 2: loss = 0.017154,	Top-1 err = 94.700000,	Top-5 err = 82.000000,	train_time = 0.313733
+TRAIN Iter 3: loss = 0.016403,	Top-1 err = 93.700000,	Top-5 err = 79.700000,	train_time = 0.316902
+TRAIN Iter 4: loss = 0.015574,	Top-1 err = 94.800000,	Top-5 err = 78.800000,	train_time = 0.320363
+TRAIN Iter 5: loss = 0.014486,	Top-1 err = 92.300000,	Top-5 err = 76.200000,	train_time = 0.307342
+TEST:
+Iter 5: loss = 4.397472,	Top-1 err = 89.240000,	Top-5 err = 66.840000,	val_time = 0.819002
+Train Finish! Best accuracy is 10.76@5

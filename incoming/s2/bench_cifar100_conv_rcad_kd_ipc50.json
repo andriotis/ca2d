@@ -1,0 +1,20 @@
+{
+  "dataset": "cifar100",
+  "arch": "conv",
+  "method": "rcad",
+  "regime": "kd",
+  "ipc": 50,
+  "set": "rcad_feat_fl_ipc50",
+  "seeds": [
+    46
+  ],
+  "accs": [
+    57.99
+  ],
+  "mean": 57.99,
+  "std": 0.0,
+  "seed_secs": [
+    160.3
+  ],
+  "total_secs": 160.3
+}

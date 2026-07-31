@@ -1,0 +1,26 @@
+{
+  "dataset": "tin",
+  "arch": "rn18",
+  "method": "sharp",
+  "regime": "hl",
+  "ipc": 10,
+  "set": "bench_tin_rn18_sharp_ipc10",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    7.33,
+    5.92,
+    6.72
+  ],
+  "mean": 6.656666666666666,
+  "std": 0.5773695138778594,
+  "seed_secs": [
+    569.6,
+    572.2,
+    567.3
+  ],
+  "total_secs": 1740.4
+}

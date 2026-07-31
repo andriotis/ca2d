@@ -1,0 +1,29 @@
+{
+  "dataset": "tin",
+  "arch": "conv",
+  "method": "rded",
+  "regime": "hl",
+  "ipc": 10,
+  "set": "bench_tin_conv_rded_ipc10",
+  "seeds": [
+    42,
+    43,
+    44,
+    45
+  ],
+  "accs": [
+    10.71,
+    10.39,
+    10.12,
+    9.84
+  ],
+  "mean": 10.265,
+  "std": 0.3222188697143609,
+  "seed_secs": [
+    99.6,
+    212.9,
+    351.2,
+    110.2
+  ],
+  "total_secs": 773.9
+}

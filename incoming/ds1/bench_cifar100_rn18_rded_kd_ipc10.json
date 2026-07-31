@@ -1,0 +1,23 @@
+{
+  "dataset": "cifar100",
+  "arch": "rn18",
+  "method": "rded",
+  "regime": "kd",
+  "ipc": 10,
+  "set": "bench_cifar100_rn18_rded_ipc10",
+  "seeds": [
+    45,
+    46
+  ],
+  "accs": [
+    44.54,
+    43.28
+  ],
+  "mean": 44.414,
+  "std": 0.6977564044851189,
+  "seed_secs": [
+    149.4,
+    149.6
+  ],
+  "total_secs": 743.6
+}

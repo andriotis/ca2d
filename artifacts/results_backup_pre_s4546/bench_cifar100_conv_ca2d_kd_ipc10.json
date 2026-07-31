@@ -1,0 +1,26 @@
+{
+  "dataset": "cifar100",
+  "arch": "conv",
+  "method": "ca2d",
+  "regime": "kd",
+  "ipc": 10,
+  "set": "ca2d_ipc10",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    47.75,
+    48.95,
+    48.62
+  ],
+  "mean": 48.44,
+  "std": 0.5061620293937512,
+  "seed_secs": [
+    129.3,
+    130.3,
+    128.7
+  ],
+  "total_secs": 388.3
+}

@@ -1,0 +1,22 @@
+{
+  "dataset": "cifar100",
+  "arch": "conv",
+  "method": "sharp",
+  "regime": "hl",
+  "ipc": 10,
+  "set": "sharp_fl_grad_a100_ipc10",
+  "seeds": [
+    42,
+    43,
+    44,
+    45
+  ],
+  "accs": [
+    24.24,
+    24.02,
+    24.29,
+    24.55
+  ],
+  "mean": 24.275,
+  "std": 0.18848076824970808
+}

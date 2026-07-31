@@ -1,3 +1,13 @@
-artifacts/
+# Ignore artifacts by default, but keep experiment results and logs.
+# Must use artifacts/* (not artifacts/) so the negations below can re-include.
+artifacts/*
+!artifacts/results/
+!artifacts/logs/
+!artifacts/results_backup_pre_s4546/
+
+# Same for relay: keep only the merged results.
+relay/*
+!relay/results/
+
 __pycache__/
 *.pyc

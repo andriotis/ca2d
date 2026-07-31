@@ -1,0 +1,25 @@
+{
+  "dataset": "cifar100",
+  "name": "ca2d_ipc10",
+  "arch": "convnet",
+  "regime": "sl",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    26.52,
+    26.57,
+    26.89
+  ],
+  "mean": 26.66,
+  "std": 0.1639105447085903,
+  "seed_secs": [
+    58.1,
+    58.2,
+    58.1
+  ],
+  "total_secs": 178.0,
+  "batch": 256
+}

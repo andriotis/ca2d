@@ -1,0 +1,26 @@
+{
+  "dataset": "tin",
+  "arch": "rn18",
+  "method": "sharp2d",
+  "regime": "sl",
+  "ipc": 50,
+  "set": "bench_tin_rn18_sharp2d_ipc50",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    35.96,
+    36.48,
+    35.31
+  ],
+  "mean": 35.916666666666664,
+  "std": 0.47863231074477913,
+  "seed_secs": [
+    2736.4,
+    2736.0,
+    2736.3
+  ],
+  "total_secs": 8215.2
+}

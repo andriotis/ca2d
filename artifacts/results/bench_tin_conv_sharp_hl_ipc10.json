@@ -1,0 +1,29 @@
+{
+  "dataset": "tin",
+  "arch": "conv",
+  "method": "sharp",
+  "regime": "hl",
+  "ipc": 10,
+  "set": "tin_sharpfl_ipc10",
+  "seeds": [
+    42,
+    43,
+    44,
+    45
+  ],
+  "accs": [
+    11.41,
+    11.74,
+    11.4,
+    11.0
+  ],
+  "mean": 11.3875,
+  "std": 0.2622379644521366,
+  "seed_secs": [
+    120.6,
+    119.7,
+    139.4,
+    110.1
+  ],
+  "total_secs": 489.8
+}

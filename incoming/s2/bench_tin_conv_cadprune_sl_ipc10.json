@@ -1,0 +1,20 @@
+{
+  "dataset": "tin",
+  "arch": "conv",
+  "method": "cadprune",
+  "regime": "sl",
+  "ipc": 10,
+  "set": "tin_cadprune_ipc10",
+  "seeds": [
+    46
+  ],
+  "accs": [
+    18.14
+  ],
+  "mean": 18.14,
+  "std": 0.0,
+  "seed_secs": [
+    60.7
+  ],
+  "total_secs": 61.4
+}

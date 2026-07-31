@@ -1,0 +1,26 @@
+{
+  "dataset": "cifar100",
+  "arch": "conv",
+  "method": "ca2d",
+  "regime": "sl",
+  "ipc": 100,
+  "set": "bench_cifar100_conv_ca2d_ipc100",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    45.81,
+    46.14,
+    45.22
+  ],
+  "mean": 45.723333333333336,
+  "std": 0.3805551500403363,
+  "seed_secs": [
+    148.3,
+    148.7,
+    148.9
+  ],
+  "total_secs": 449.5
+}
