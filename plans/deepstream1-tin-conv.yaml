@@ -1,0 +1,21 @@
+# deepstream1 (2x 3080) PHASE 1 of 2 — conv-TIN, all methods.
+# Chained ahead of deepstream1-tin-rn18.yaml:
+#   cd ~/nikos/ca2d && setsid nohup bash -c 'python bench.py launch \
+#     plans/deepstream1-tin-conv.yaml && python bench.py launch \
+#     plans/deepstream1-tin-rn18.yaml' > artifacts/logs/ds1_chain.log 2>&1 &
+#
+# 26 incomplete cells: 25 at ipc100 missing seeds 42-44, plus random/hl/ipc10
+# missing seed 46. That last one had its JSON deleted so all 5 seeds rerun here
+# on one set — it is the cell whose set name (tin_random_ipc10 vs
+# bench_tin_random_ipc10) disagreed across machines. Everything else is
+# cached-skipped. ~37 GPU-h.
+#
+# Disjoint from deepstream2-tin-rn18.yaml by table+method -> no shared cell.
+jobs:
+  - name: convtin-all
+    table: conv-tin
+    seeds: [42, 43, 44, 45, 46]
+    regimes: [hl, sl, kd]
+    ipcs: [10, 50, 100]
+    methods: [random, el2nbest, cadprune, sharp, rcad, rded, ca2d, sharp2d, rcad2d]
+    devices: [cuda:0, cuda:1]

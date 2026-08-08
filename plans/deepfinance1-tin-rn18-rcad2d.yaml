@@ -1,0 +1,22 @@
+# deepfinance1 (2x 3090) — the single remaining uncomputed cell in the campaign.
+#
+# tin/rn18/rcad2d/kd/ipc100 is 0/5 seeds on every box (laptop, ds1, ds2, df1), the
+# only such cell left. Everything else outstanding is already assigned:
+#   ds2 -> random kd/100 (running), sharp kd/100
+#   ds1 -> el2nbest kd/100 (running), cadprune kd/100
+#
+# Scoped to exactly ONE cell on purpose. df1's own artifacts/results/ is stale (July)
+# and disagrees with the merged truth on ~30 seeds, so a wider plan would let df1
+# "skip" cells on the strength of results we are not adopting, or recompute cells
+# other boxes are already doing. One cell = no possible overlap, nothing to ship.
+#
+# Set bench_tin_rn18_rcad2d_ipc100 and the TIN rn18 teacher are already present here.
+# ~5 seeds of kd/ipc100 on 2x 3090 -> roughly 6 h.
+jobs:
+  - name: rcad2d-kd-ipc100
+    table: rn18-tin
+    seeds: [42, 43, 44, 45, 46]
+    regimes: [kd]
+    ipcs: [100]
+    methods: [rcad2d]
+    devices: [cuda:0, cuda:1]

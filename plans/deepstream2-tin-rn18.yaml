@@ -1,0 +1,22 @@
+# deepstream2 (2x 3080) — rn18-TIN, methods {random, sharp, rcad2d, sharp2d}.
+#
+# 22 incomplete cells, 86 seed-runs, ~129 GPU-h (~65 h wall on 2 GPUs).
+# Disjoint from both deepstream1 plans by table+method -> no shared cell, so
+# `merge` can never conflict between the two boxes.
+#
+# This box had an EMPTY artifacts/sets; the 10 sets these cells need were
+# staged laptop-side from deepstream1 and pushed here (1.3G). It needs no
+# score blobs: every set is prebuilt, so nothing triggers scoring (which would
+# OOM a 10GB card). `launch --dry-run` must report no uncached scoring — if it
+# warns, a set is missing and must be shipped rather than rebuilt here.
+#
+# NOTE cuda:0 on this box sits on a PCIe x4 link (half h2d bandwidth); the
+# device pool absorbs the difference, but its seeds run a little slower.
+jobs:
+  - name: rn18tin-rand-sharp-2d
+    table: rn18-tin
+    seeds: [42, 43, 44, 45, 46]
+    regimes: [hl, sl, kd]
+    ipcs: [10, 50, 100]
+    methods: [random, sharp, rcad2d, sharp2d]
+    devices: [cuda:0, cuda:1]

@@ -4,26 +4,29 @@
   "method": "random",
   "regime": "hl",
   "ipc": 10,
-  "set": "bench_tin_random_ipc10",
+  "set": "tin_random_ipc10",
   "seeds": [
     42,
     43,
     44,
-    45
+    45,
+    46
   ],
   "accs": [
     6.14,
     6.47,
     6.39,
-    6.22
+    6.22,
+    6.1
   ],
-  "mean": 6.305,
-  "std": 0.1312440474840669,
+  "mean": 6.264,
+  "std": 0.14319217855735,
   "seed_secs": [
     116.2,
     126.3,
     130.2,
-    109.6
+    114.5,
+    109.8
   ],
-  "total_secs": 482.3
+  "total_secs": 597.0
 }

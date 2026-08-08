@@ -1,0 +1,20 @@
+# deepstream1 (2x 3080) PHASE 2 of 2 — rn18-TIN, methods {el2nbest, cadprune}.
+#
+# el2nbest is the expensive half: the hl/ipc100 and sl/ipc100 window searches
+# are NOT cached anywhere (only kd/ipc100 is), so this job pays ~32 GPU-h of
+# seed-42 window search on top of its eval seeds. That work would normally go
+# to a 24GB box, but deepfinance1 is down and symphony2 is in use by someone
+# else, so it runs here — the 3080s only OOM on full-dataset EL2N *scoring*,
+# and the 10 el2n_tin_rn18_e20_run*.pt blobs are already cached on this box,
+# so the search itself is set-sized and fits 10GB.
+#
+# ~102 GPU-h of eval + ~32 GPU-h of search.
+# Disjoint from deepstream2-tin-rn18.yaml by method -> no shared cell.
+jobs:
+  - name: rn18tin-el2n-cadprune
+    table: rn18-tin
+    seeds: [42, 43, 44, 45, 46]
+    regimes: [hl, sl, kd]
+    ipcs: [10, 50, 100]
+    methods: [el2nbest, cadprune]
+    devices: [cuda:0, cuda:1]
