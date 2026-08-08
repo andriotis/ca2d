@@ -1,0 +1,20 @@
+{
+  "dataset": "tin",
+  "arch": "conv",
+  "method": "ca2d",
+  "regime": "hl",
+  "ipc": 10,
+  "set": "tin_ca2d_ipc10",
+  "seeds": [
+    46
+  ],
+  "accs": [
+    10.32
+  ],
+  "mean": 10.32,
+  "std": 0.0,
+  "seed_secs": [
+    60.1
+  ],
+  "total_secs": 60.9
+}

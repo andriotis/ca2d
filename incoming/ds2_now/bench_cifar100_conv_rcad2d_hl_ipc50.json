@@ -1,0 +1,24 @@
+{
+  "dataset": "cifar100",
+  "arch": "conv",
+  "method": "rcad2d",
+  "regime": "hl",
+  "ipc": 50,
+  "set": "rcad2d_feat_fl_ipc50",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "accs": [
+    35.94,
+    35.72,
+    36.28,
+    35.5,
+    36.37
+  ],
+  "mean": 35.962,
+  "std": 0.3286578768263433
+}

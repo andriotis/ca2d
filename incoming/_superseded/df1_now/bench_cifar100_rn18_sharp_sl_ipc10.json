@@ -1,0 +1,26 @@
+{
+  "dataset": "cifar100",
+  "arch": "rn18",
+  "method": "sharp",
+  "regime": "sl",
+  "ipc": 10,
+  "set": "bench_cifar100_rn18_sharp_ipc10",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    26.51,
+    24.84,
+    26.62
+  ],
+  "mean": 25.99,
+  "std": 0.8144118532208797,
+  "seed_secs": [
+    341.0,
+    341.0,
+    341.0
+  ],
+  "total_secs": 1024.6
+}

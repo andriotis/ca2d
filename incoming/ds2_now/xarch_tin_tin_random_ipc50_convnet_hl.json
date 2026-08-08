@@ -1,0 +1,25 @@
+{
+  "dataset": "tin",
+  "name": "tin_random_ipc50",
+  "arch": "convnet",
+  "regime": "hl",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    17.43,
+    17.41,
+    17.07
+  ],
+  "mean": 17.303333333333335,
+  "std": 0.1651934892448514,
+  "seed_secs": [
+    665.9,
+    656.4,
+    624.2
+  ],
+  "total_secs": 1948.5,
+  "batch": 256
+}

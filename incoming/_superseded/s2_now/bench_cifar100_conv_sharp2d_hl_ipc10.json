@@ -1,0 +1,20 @@
+{
+  "dataset": "cifar100",
+  "arch": "conv",
+  "method": "sharp2d",
+  "regime": "hl",
+  "ipc": 10,
+  "set": "bench_cifar100_conv_sharp2d_ipc10",
+  "seeds": [
+    46
+  ],
+  "accs": [
+    21.22
+  ],
+  "mean": 21.22,
+  "std": 0.0,
+  "seed_secs": [
+    7.5
+  ],
+  "total_secs": 8.5
+}

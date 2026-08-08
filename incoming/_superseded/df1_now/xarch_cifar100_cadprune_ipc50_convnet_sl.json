@@ -1,0 +1,25 @@
+{
+  "dataset": "cifar100",
+  "name": "cadprune_ipc50",
+  "arch": "convnet",
+  "regime": "sl",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    43.67,
+    44.33,
+    43.39
+  ],
+  "mean": 43.79666666666666,
+  "std": 0.3940671121635095,
+  "seed_secs": [
+    289.1,
+    288.7,
+    288.4
+  ],
+  "total_secs": 869.8,
+  "batch": 256
+}

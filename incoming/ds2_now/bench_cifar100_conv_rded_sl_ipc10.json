@@ -1,0 +1,32 @@
+{
+  "dataset": "cifar100",
+  "arch": "conv",
+  "method": "rded",
+  "regime": "sl",
+  "ipc": 10,
+  "set": "bench_cifar100_conv_rded_ipc10",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "accs": [
+    26.15,
+    26.35,
+    25.95,
+    25.69,
+    26.2
+  ],
+  "mean": 26.068,
+  "std": 0.2282454818829935,
+  "seed_secs": [
+    14.9,
+    15.0,
+    14.9,
+    14.9,
+    7.8
+  ],
+  "total_secs": 67.5
+}

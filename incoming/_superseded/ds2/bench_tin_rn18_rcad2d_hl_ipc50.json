@@ -1,0 +1,26 @@
+{
+  "dataset": "tin",
+  "arch": "rn18",
+  "method": "rcad2d",
+  "regime": "hl",
+  "ipc": 50,
+  "set": "bench_tin_rn18_rcad2d_ipc50",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    19.81,
+    19.01,
+    20.04
+  ],
+  "mean": 19.62,
+  "std": 0.4414370472294613,
+  "seed_secs": [
+    2791.7,
+    2819.5,
+    2803.0
+  ],
+  "total_secs": 8597.5
+}

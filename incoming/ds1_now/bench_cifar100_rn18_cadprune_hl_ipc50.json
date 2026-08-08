@@ -1,0 +1,32 @@
+{
+  "dataset": "cifar100",
+  "arch": "rn18",
+  "method": "cadprune",
+  "regime": "hl",
+  "ipc": 50,
+  "set": "bench_cifar100_rn18_cadprune_ipc50",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "accs": [
+    34.5,
+    33.26,
+    32.58,
+    32.24,
+    33.25
+  ],
+  "mean": 33.166,
+  "std": 0.7741214375018945,
+  "seed_secs": [
+    765.0,
+    766.3,
+    768.0,
+    762.4,
+    761.8
+  ],
+  "total_secs": 3824.5
+}

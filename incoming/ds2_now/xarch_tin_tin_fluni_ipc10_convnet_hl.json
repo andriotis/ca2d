@@ -1,0 +1,25 @@
+{
+  "dataset": "tin",
+  "name": "tin_fluni_ipc10",
+  "arch": "convnet",
+  "regime": "hl",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    11.04,
+    10.46,
+    10.15
+  ],
+  "mean": 10.549999999999999,
+  "std": 0.3688721549082639,
+  "seed_secs": [
+    119.9,
+    116.6,
+    110.5
+  ],
+  "total_secs": 348.2,
+  "batch": 256
+}

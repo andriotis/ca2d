@@ -1,0 +1,25 @@
+{
+  "dataset": "tin",
+  "name": "tin_ca2d_ipc10",
+  "arch": "convnet",
+  "regime": "sl",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "accs": [
+    18.43,
+    17.41,
+    17.35
+  ],
+  "mean": 17.73,
+  "std": 0.49558046773455416,
+  "seed_secs": [
+    410.2,
+    410.1,
+    410.2
+  ],
+  "total_secs": 1232.6,
+  "batch": 256
+}

@@ -1,0 +1,20 @@
+{
+  "dataset": "tin",
+  "arch": "conv",
+  "method": "rcad2d",
+  "regime": "kd",
+  "ipc": 50,
+  "set": "bench_tin_conv_rcad2d_ipc50",
+  "seeds": [
+    46
+  ],
+  "accs": [
+    48.82
+  ],
+  "mean": 48.82,
+  "std": 0.0,
+  "seed_secs": [
+    527.1
+  ],
+  "total_secs": 527.1
+}

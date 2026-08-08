@@ -1,0 +1,23 @@
+{
+  "dataset": "tin",
+  "arch": "rn18",
+  "method": "cadprune",
+  "regime": "hl",
+  "ipc": 50,
+  "set": "bench_tin_rn18_cadprune_ipc50",
+  "seeds": [
+    45,
+    46
+  ],
+  "accs": [
+    22.89,
+    23.59
+  ],
+  "mean": 23.240000000000002,
+  "std": 0.34999999999999964,
+  "seed_secs": [
+    12083.9,
+    12470.7
+  ],
+  "total_secs": 24556.9
+}
